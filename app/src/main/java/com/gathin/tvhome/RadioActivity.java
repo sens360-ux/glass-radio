@@ -31,6 +31,9 @@ public class RadioActivity extends Activity {
     private int stationRequest=0;
     private LinearLayout stationList, favoriteList, recentList;
     private TextView status, nowName, nowLogo, countLabel;
+    private ImageView stationArtwork;
+    private final android.os.Handler uiHandler=new android.os.Handler(android.os.Looper.getMainLooper());
+    private int artworkRequest=0;
     private Button playButton, favButton;
     private String[] current;
     private String filter="";
@@ -54,7 +57,10 @@ public class RadioActivity extends Activity {
         countLabel=text("Loading stations...",12,MUTED,false);left.addView(countLabel,new LinearLayout.LayoutParams(-1,dp(32)));
         ScrollView scroll=new ScrollView(this);stationList=column();scroll.addView(stationList);left.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout center=panel("◉   NOW PLAYING");center.setGravity(Gravity.CENTER_HORIZONTAL);LinearLayout.LayoutParams centerP=new LinearLayout.LayoutParams(0,-1,39);centerP.rightMargin=dp(12);body.addView(center,centerP);
-        nowLogo=text("♫",76,CYAN,true);nowLogo.setGravity(Gravity.CENTER);nowLogo.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0xff1765a1,0xff092b50}));nowLogo.setElevation(dp(12));LinearLayout.LayoutParams logoP=new LinearLayout.LayoutParams(dp(176),dp(160));logoP.topMargin=dp(15);center.addView(nowLogo,logoP);
+        nowLogo=text("♫",76,CYAN,true);nowLogo.setGravity(Gravity.CENTER);nowLogo.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0xff1765a1,0xff092b50}));nowLogo.setElevation(dp(12));LinearLayout.LayoutParams logoP=new LinearLayout.LayoutParams(dp(176),dp(160));logoP.topMargin=dp(15);android.widget.FrameLayout artFrame=new android.widget.FrameLayout(this);artFrame.setBackground(bg(0xff10395a,22));artFrame.setClipToOutline(true);center.addView(artFrame,logoP);
+        android.widget.FrameLayout.LayoutParams fillArt=new android.widget.FrameLayout.LayoutParams(-1,-1);
+        artFrame.addView(nowLogo,fillArt);
+        stationArtwork=new ImageView(this);stationArtwork.setScaleType(ImageView.ScaleType.FIT_CENTER);stationArtwork.setPadding(dp(14),dp(14),dp(14),dp(14));stationArtwork.setVisibility(View.GONE);artFrame.addView(stationArtwork,new android.widget.FrameLayout.LayoutParams(-1,-1));
         nowName=text("Choose your station",25,WHITE,true);nowName.setGravity(Gravity.CENTER);nowName.setSingleLine(true);nowName.setEllipsize(android.text.TextUtils.TruncateAt.END);LinearLayout.LayoutParams nameP=new LinearLayout.LayoutParams(-1,dp(58));nameP.topMargin=dp(8);center.addView(nowName,nameP);
         status=text("READY  •  DISCOVER MALAYSIAN RADIO",13,MUTED,false);status.setGravity(Gravity.CENTER);center.addView(status,new LinearLayout.LayoutParams(-1,dp(35)));
         LinearLayout controls=new LinearLayout(this);controls.setGravity(Gravity.CENTER);Button prev=button("⏮");playButton=button("▶  PLAY");Button next=button("⏭");controls.addView(prev,new LinearLayout.LayoutParams(0,dp(56),1));controls.addView(playButton,new LinearLayout.LayoutParams(0,dp(56),2));controls.addView(next,new LinearLayout.LayoutParams(0,dp(56),1));LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,dp(56));cp.topMargin=dp(15);center.addView(controls,cp);prev.setOnClickListener(v->skip(-1));next.setOnClickListener(v->skip(1));playButton.setOnClickListener(v->toggle());
@@ -63,7 +69,7 @@ public class RadioActivity extends Activity {
         TextView footer=text("◀ ▶ ▲ ▼  NAVIGATE          OK  SELECT / PLAY          BACK  HOME",12,MUTED,false);footer.setGravity(Gravity.CENTER);root.addView(footer,new LinearLayout.LayoutParams(-1,dp(37)));
         setContentView(root);renderSides();load();
     }
-    private void load(){new Thread(()->{ArrayList<String[]> found=new ArrayList<>();try{HttpURLConnection c=(HttpURLConnection)new URL(API).openConnection();c.setConnectTimeout(12000);c.setReadTimeout(15000);c.setRequestProperty("User-Agent","GlassTV/4.0");try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] buf=new byte[8192];int n;while((n=in.read(buf))!=-1)out.write(buf,0,n);JSONArray arr=new JSONArray(out.toString("UTF-8"));HashSet<String> seen=new HashSet<>();for(int i=0;i<arr.length();i++){JSONObject o=arr.getJSONObject(i);String name=o.optString("name").trim();String url=o.optString("url_resolved",o.optString("url")).trim();if(name.isEmpty()||!url.startsWith("https://")||!seen.add(name.toLowerCase(Locale.ROOT)))continue;found.add(new String[]{name,url});}}}catch(Exception ignored){}runOnUiThread(()->{stations.clear();stations.addAll(found);renderStations();if(found.isEmpty())status.setText("Station directory unavailable • Check internet");else if(stationList.getChildCount()>0)stationList.getChildAt(0).requestFocus();});}).start();}
+    private void load(){new Thread(()->{ArrayList<String[]> found=new ArrayList<>();try{HttpURLConnection c=(HttpURLConnection)new URL(API).openConnection();c.setConnectTimeout(12000);c.setReadTimeout(15000);c.setRequestProperty("User-Agent","GlassTV/4.0");try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] buf=new byte[8192];int n;while((n=in.read(buf))!=-1)out.write(buf,0,n);JSONArray arr=new JSONArray(out.toString("UTF-8"));HashSet<String> seen=new HashSet<>();for(int i=0;i<arr.length();i++){JSONObject o=arr.getJSONObject(i);String name=o.optString("name").trim();String url=o.optString("url_resolved",o.optString("url")).trim();String favicon=o.optString("favicon","").trim();if(name.isEmpty()||!url.startsWith("https://")||!seen.add(name.toLowerCase(Locale.ROOT)))continue;found.add(new String[]{name,url,favicon});}}}catch(Exception ignored){}runOnUiThread(()->{stations.clear();stations.addAll(found);renderStations();if(found.isEmpty())status.setText("Station directory unavailable • Check internet");else if(stationList.getChildCount()>0)stationList.getChildAt(0).requestFocus();});}).start();}
     private void renderStations(){if(stationList==null)return;stationList.removeAllViews();visible.clear();for(String[] s:stations){if(!s[0].toLowerCase(Locale.ROOT).contains(filter))continue;visible.add(s);Button b=button("♫  "+s[0]+(favorites.contains(s[0])?"  ♥":""));b.setGravity(Gravity.CENTER_VERTICAL|Gravity.LEFT);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,dp(48));p.bottomMargin=dp(7);stationList.addView(b,p);b.setOnClickListener(v->play(s));if(visible.size()>=300)break;}countLabel.setText(stations.isEmpty()?"Connecting to radio directory...":visible.size()+" stations shown • "+stations.size()+" available");}
     private void renderSides(){if(favoriteList==null)return;favoriteList.removeAllViews();recentList.removeAllViews();for(String name:favorites)addSide(favoriteList,name);for(String name:recent)addSide(recentList,name);if(favorites.isEmpty())favoriteList.addView(text("Press ♡ to save a station",13,MUTED,false));if(recent.isEmpty())recentList.addView(text("Your played stations appear here",13,MUTED,false));}
     private void addSide(LinearLayout parent,String name){Button b=button("♫  "+name);b.setGravity(Gravity.LEFT|Gravity.CENTER_VERTICAL);parent.addView(b,new LinearLayout.LayoutParams(-1,dp(47)));b.setOnClickListener(v->{for(String[] s:stations)if(s[0].equals(name)){play(s);break;}});}
@@ -78,7 +84,7 @@ public class RadioActivity extends Activity {
     private void play(String[] s){
         if(current!=null&&current[0].equals(s[0])&&player!=null){if(!player.isPlaying())player.play();return;}
         current=s;nowName.setText(s[0]);
-        nowLogo.setText(s[0].substring(0,Math.min(2,s[0].length())).toUpperCase(Locale.ROOT));
+        nowLogo.setText(s[0].substring(0,Math.min(2,s[0].length())).toUpperCase(Locale.ROOT));showArtwork(s);
         status.setText("Connecting to "+s[0]+"...");playButton.setText("… CONNECTING");
         favButton.setText(favorites.contains(s[0])?"♥  REMOVE FAVOURITE":"♡  ADD TO FAVOURITES");
         recent.remove(s[0]);recent.addFirst(s[0]);while(recent.size()>8)recent.removeLast();
@@ -101,6 +107,22 @@ public class RadioActivity extends Activity {
             exo.stop();exo.clearMediaItems();exo.setMediaItem(MediaItem.fromUri(s[1]));exo.prepare();exo.play();
         }catch(Exception e){stopPlayer();status.setText("Unable to play this station");playButton.setText("▶  RETRY");}
     }
-    private void stopPlayer(){stationRequest++;playing=false;if(player!=null){player.release();player=null;}}
+    private void showArtwork(String[] s){
+        final int request=++artworkRequest;
+        stationArtwork.setImageDrawable(null);stationArtwork.setVisibility(View.GONE);nowLogo.setVisibility(View.VISIBLE);
+        if(s.length<3||!s[2].startsWith("https://"))return;
+        new Thread(()->{android.graphics.Bitmap bitmap=null;try{
+            HttpURLConnection conn=(HttpURLConnection)new URL(s[2]).openConnection();conn.setConnectTimeout(5000);conn.setReadTimeout(5000);
+            conn.setRequestProperty("User-Agent","GlassTV-Radio/1.0");
+            try(InputStream input=conn.getInputStream()){bitmap=android.graphics.BitmapFactory.decodeStream(input);}
+            conn.disconnect();
+        }catch(Exception ignored){}
+            final android.graphics.Bitmap result=bitmap;
+            runOnUiThread(()->{if(request!=artworkRequest||isFinishing()||isDestroyed())return;
+                if(result!=null){stationArtwork.setImageBitmap(result);stationArtwork.setVisibility(View.VISIBLE);nowLogo.setVisibility(View.GONE);}
+            });
+        }).start();
+    }
+    private void stopPlayer(){artworkRequest++;stationRequest++;playing=false;if(player!=null){player.release();player=null;}}
     @Override protected void onDestroy(){stopPlayer();super.onDestroy();}
 }
