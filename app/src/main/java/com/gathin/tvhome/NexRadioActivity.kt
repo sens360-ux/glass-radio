@@ -16,6 +16,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.text.font.FontWeight
@@ -47,7 +49,7 @@ class NexRadioActivity:ComponentActivity(){
    var playing by remember { mutableStateOf(false) }
    var status by remember { mutableStateOf("Loading Malaysian stations…") }
    var favourites by remember { mutableStateOf((prefs.getStringSet("favourites",null) ?: legacy.getStringSet("favorites",emptySet()) ?: emptySet()).toSet()) }
-   var recent by remember { mutableStateOf(prefs.getString("recent","")!!.split("\n").filter { it.isNotBlank() }) }
+   var recent by remember { mutableStateOf((prefs.getString("recent",null) ?: legacy.getString("recent","") ?: "").split("\n").filter { it.isNotBlank() }) }
    fun fav(name:String){favourites=if(name in favourites) favourites-name else favourites+name;prefs.edit().putStringSet("favourites",favourites).apply()}
    fun play(s:Station){selected=s;status="Connecting…";recent=(listOf(s.name)+recent.filter { it!=s.name }).take(12);prefs.edit().putString("recent",recent.joinToString("\n")).apply()
     engine?.apply {stop();setMediaItem(MediaItem.fromUri(s.url));prepare();play()};playing=true}
@@ -56,8 +58,11 @@ class NexRadioActivity:ComponentActivity(){
     override fun onPlayerError(error:androidx.media3.common.PlaybackException){status="Stream unavailable";playing=false}
     override fun onIsPlayingChanged(isPlaying:Boolean){playing=isPlaying}
    };engine?.addListener(listener);onDispose {engine?.removeListener(listener)}}
+   val firstStationFocus=remember { FocusRequester() }
+   LaunchedEffect(stations.size){if(stations.isNotEmpty())firstStationFocus.requestFocus()}
    LaunchedEffect(Unit){stations=withContext(Dispatchers.IO){try{
-    val arr=JSONArray(URL("https://de1.api.radio-browser.info/json/stations/bycountrycodeexact/MY?hidebroken=true&order=votes&reverse=true&limit=300").openText())
+    val connection=URL("https://de1.api.radio-browser.info/json/stations/bycountrycodeexact/MY?hidebroken=true&order=votes&reverse=true&limit=300").openConnection().apply { connectTimeout=12000;readTimeout=15000 }
+    val arr=JSONArray(connection.getInputStream().bufferedReader().use { it.readText() })
     (0 until arr.length()).mapNotNull {i->val o=arr.getJSONObject(i);val name=o.optString("name").trim();val url=o.optString("url_resolved",o.optString("url"));if(name.isBlank()||!url.startsWith("http"))null else Station(name,url)}.distinctBy {it.name.lowercase()}
    }catch(e:Exception){emptyList()}};status=if(stations.isEmpty())"Directory unavailable" else "Select a station"}
    val transition=rememberInfiniteTransition(label="radio")
@@ -79,7 +84,7 @@ class NexRadioActivity:ComponentActivity(){
         items(stations,key={it.name}){s->
          var focused by remember {mutableStateOf(false)}
          var held by remember {mutableStateOf(false)}
-         Row(Modifier.fillMaxWidth().height(54.dp).clip(RoundedCornerShape(13.dp))
+         Row(Modifier.then(if(stations.firstOrNull()==s)Modifier.focusRequester(firstStationFocus) else Modifier).fillMaxWidth().height(54.dp).clip(RoundedCornerShape(13.dp))
           .background(if(focused||selected?.name==s.name)Color(0xFF135477) else Color(0xFF162942))
           .onFocusChanged{focused=it.isFocused}
           .onPreviewKeyEvent {ev->
@@ -88,7 +93,7 @@ class NexRadioActivity:ComponentActivity(){
             else if(ev.type==KeyEventType.KeyUp){val wasHeld=held;held=false;if(!wasHeld)play(s);true}
             else true
            }else false
-          }.clickable {play(s)}.focusable().padding(horizontal=14.dp),verticalAlignment=Alignment.CenterVertically){
+          }.focusable().padding(horizontal=14.dp),verticalAlignment=Alignment.CenterVertically){
           Text("♫",color=cyan,fontSize=22.sp);Spacer(Modifier.width(12.dp))
           Text(s.name,color=white,fontSize=15.sp,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.weight(1f))
           Text(if(s.name in favourites)"♥" else "♡",color=cyan,fontSize=19.sp)
