@@ -31,6 +31,34 @@ class NexTvRadioFocusTest {
         assertEquals(NexTvRadioFocus.Zone.Controls, f.next(NexTvRadioFocus.Zone.Menu, NexTvRadioFocus.Dir.Down, false, false))
     }
 
+
+    @Test fun controlsRightReachesRecentWhenAvailable() {
+        assertEquals(
+            NexTvRadioFocus.Zone.Recent,
+            f.next(NexTvRadioFocus.Zone.Controls, NexTvRadioFocus.Dir.Right, true, true, control = 2, hasRecent = true),
+        )
+        assertEquals(
+            NexTvRadioFocus.Zone.Recent,
+            f.next(NexTvRadioFocus.Zone.Controls, NexTvRadioFocus.Dir.Right, true, false, control = 2, hasRecent = true),
+        )
+    }
+
+    @Test fun recentPanelRoutesToFavouritesAndBackToPlayer() {
+        assertEquals(
+            NexTvRadioFocus.Zone.Favourites,
+            f.next(NexTvRadioFocus.Zone.Recent, NexTvRadioFocus.Dir.Down, true, true, hasRecent = true),
+        )
+        assertNull(f.next(NexTvRadioFocus.Zone.Recent, NexTvRadioFocus.Dir.Down, true, false, hasRecent = true))
+        assertEquals(
+            NexTvRadioFocus.Zone.Controls,
+            f.next(NexTvRadioFocus.Zone.Recent, NexTvRadioFocus.Dir.Left, true, true, hasRecent = true),
+        )
+        assertEquals(
+            NexTvRadioFocus.Zone.Recent,
+            f.next(NexTvRadioFocus.Zone.Favourites, NexTvRadioFocus.Dir.Up, true, true, hasRecent = true),
+        )
+    }
+
     @Test fun firstStationDetectionUsesFocusedId() {
         assertTrue(f.onFirstStation(listOf("one", "two"), "one"))
         assertFalse(f.onFirstStation(listOf("one", "two"), "two"))
