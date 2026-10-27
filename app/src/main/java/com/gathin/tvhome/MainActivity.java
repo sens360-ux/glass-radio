@@ -3192,7 +3192,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         builder.setPositiveButton("Ya, Restart", (dialog, which) -> {
             dialog.dismiss();
             Toast.makeText(MainActivity.this, "Memulakan semula TV...", Toast.LENGTH_SHORT).show();
-            handler.postDelayed(() -> HomeKeyService.restartTv(MainActivity.this), 300);
+            handler.postDelayed(() -> { if (!HomeKeyService.restartTv(MainActivity.this)) Toast.makeText(MainActivity.this, "Restart disekat oleh sistem TV. Gunakan menu kuasa remote.", Toast.LENGTH_LONG).show(); }, 300);
         });
         builder.setNegativeButton("Batal", (dialog, which) -> dialog.dismiss());
         AlertDialog dialog = builder.create();
@@ -3206,7 +3206,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         builder.setMessage("Adakah anda ingin memadamkan / meletakkan TV dalam mod rehat?");
         builder.setPositiveButton("Padam TV", (dialog, which) -> {
             dialog.dismiss();
-            HomeKeyService.turnOffTv(MainActivity.this);
+            if (!HomeKeyService.turnOffTv(MainActivity.this)) Toast.makeText(MainActivity.this, "Turn Off disekat oleh sistem TV. Gunakan butang kuasa remote.", Toast.LENGTH_LONG).show();
         });
         builder.setNegativeButton("Batal", (dialog, which) -> dialog.dismiss());
         AlertDialog dialog = builder.create();
