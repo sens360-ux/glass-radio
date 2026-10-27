@@ -3,6 +3,9 @@ name: Build Glass Radio APK
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - feature/nextv-radio-integration
 
 jobs:
   build:
