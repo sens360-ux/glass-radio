@@ -29,6 +29,7 @@ public class RadioActivity extends Activity {
     private final LinkedList<String> recent=new LinkedList<>();
     private ExoPlayer player;
     private int stationRequest=0;
+    private float volume=0.8f;
     private LinearLayout stationList, favoriteList, recentList;
     private TextView status, nowName, nowLogo, countLabel;
     private ImageView stationArtwork;
@@ -63,7 +64,13 @@ public class RadioActivity extends Activity {
         stationArtwork=new ImageView(this);stationArtwork.setScaleType(ImageView.ScaleType.FIT_CENTER);stationArtwork.setPadding(dp(14),dp(14),dp(14),dp(14));stationArtwork.setVisibility(View.GONE);artFrame.addView(stationArtwork,new android.widget.FrameLayout.LayoutParams(-1,-1));
         nowName=text("Choose your station",25,WHITE,true);nowName.setGravity(Gravity.CENTER);nowName.setSingleLine(true);nowName.setEllipsize(android.text.TextUtils.TruncateAt.END);LinearLayout.LayoutParams nameP=new LinearLayout.LayoutParams(-1,dp(58));nameP.topMargin=dp(8);center.addView(nowName,nameP);
         status=text("READY  •  DISCOVER MALAYSIAN RADIO",13,MUTED,false);status.setGravity(Gravity.CENTER);center.addView(status,new LinearLayout.LayoutParams(-1,dp(35)));
-        LinearLayout controls=new LinearLayout(this);controls.setGravity(Gravity.CENTER);Button prev=button("⏮");playButton=button("▶  PLAY");Button next=button("⏭");controls.addView(prev,new LinearLayout.LayoutParams(0,dp(56),1));controls.addView(playButton,new LinearLayout.LayoutParams(0,dp(56),2));controls.addView(next,new LinearLayout.LayoutParams(0,dp(56),1));LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,dp(56));cp.topMargin=dp(15);center.addView(controls,cp);prev.setOnClickListener(v->skip(-1));next.setOnClickListener(v->skip(1));playButton.setOnClickListener(v->toggle());
+        LinearLayout controls=new LinearLayout(this);controls.setGravity(Gravity.CENTER);Button prev=button("⏮");playButton=button("▶  PLAY");Button next=button("⏭");controls.addView(prev,new LinearLayout.LayoutParams(0,dp(56),1));controls.addView(playButton,new LinearLayout.LayoutParams(0,dp(56),2));controls.addView(next,new LinearLayout.LayoutParams(0,dp(56),1));LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,dp(56));cp.topMargin=dp(15);center.addView(controls,cp);
+        LinearLayout volumeRow=new LinearLayout(this);volumeRow.setGravity(Gravity.CENTER_VERTICAL);
+        TextView volumeIcon=text("♫  VOLUME",12,MUTED,true);volumeRow.addView(volumeIcon,new LinearLayout.LayoutParams(dp(105),dp(38)));
+        SeekBar volumeSlider=new SeekBar(this);volumeSlider.setMax(100);volumeSlider.setProgress(80);volumeSlider.setProgressTintList(ColorStateList.valueOf(CYAN));volumeSlider.setThumbTintList(ColorStateList.valueOf(CYAN));volumeRow.addView(volumeSlider,new LinearLayout.LayoutParams(0,dp(38),1));
+        volumeSlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(SeekBar bar,int progress,boolean user){if(user){volume=progress/100f;if(player!=null)player.setVolume(volume);}}public void onStartTrackingTouch(SeekBar bar){}public void onStopTrackingTouch(SeekBar bar){}});
+        LinearLayout.LayoutParams vp=new LinearLayout.LayoutParams(-1,dp(42));vp.topMargin=dp(7);center.addView(volumeRow,vp);
+        prev.setOnClickListener(v->skip(-1));next.setOnClickListener(v->skip(1));playButton.setOnClickListener(v->toggle());
         favButton=button("♡  ADD TO FAVOURITES");LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(-1,dp(52));fp.topMargin=dp(12);center.addView(favButton,fp);favButton.setOnClickListener(v->toggleFavorite());
         LinearLayout right=panel("♡   MY COLLECTION");body.addView(right,new LinearLayout.LayoutParams(0,-1,27));TextView ftitle=text("♡   FAVOURITES",14,CYAN,true);right.addView(ftitle,new LinearLayout.LayoutParams(-1,dp(34)));ScrollView fs=new ScrollView(this);favoriteList=column();fs.addView(favoriteList);right.addView(fs,new LinearLayout.LayoutParams(-1,0,1));TextView rtitle=text("◷   RECENTLY PLAYED",14,CYAN,true);right.addView(rtitle,new LinearLayout.LayoutParams(-1,dp(38)));ScrollView rs=new ScrollView(this);recentList=column();rs.addView(recentList);right.addView(rs,new LinearLayout.LayoutParams(-1,0,1));
         TextView footer=text("◀ ▶ ▲ ▼  NAVIGATE          OK  SELECT / PLAY          BACK  HOME",12,MUTED,false);footer.setGravity(Gravity.CENTER);root.addView(footer,new LinearLayout.LayoutParams(-1,dp(37)));
@@ -91,7 +98,7 @@ public class RadioActivity extends Activity {
         getPreferences(0).edit().putString("recent",android.text.TextUtils.join("\n",recent)).apply();
         renderSides();
         try{
-            if(player==null){player=new ExoPlayer.Builder(this).build();player.setAudioAttributes(new AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),true);}
+            if(player==null){player=new ExoPlayer.Builder(this).build();player.setAudioAttributes(new AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),true);player.setVolume(volume);}
             ExoPlayer exo=player;
             final int request=++stationRequest;
             exo.addListener(new Player.Listener(){
