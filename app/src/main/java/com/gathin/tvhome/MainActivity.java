@@ -345,7 +345,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         setContentView(R.layout.activity_main);
         View radioShortcut = findViewById(R.id.btnRadio);
         if (radioShortcut != null) radioShortcut.setOnClickListener(v ->
-                startActivity(new android.content.Intent(this, RadioActivity.class)));
+                startActivity(new android.content.Intent(this, NexRadioActivity.class)));
 
         density = getResources().getDisplayMetrics().density;
         // config.xml, overlaid by config.json from a pushed theme (see Config and tools/theme.sh).
