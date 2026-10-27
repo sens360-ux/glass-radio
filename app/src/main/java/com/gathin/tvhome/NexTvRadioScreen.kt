@@ -236,7 +236,7 @@ internal fun NexTvRadioScreen(
                             }
                         }
                     }
-                    Glass(Modifier.fillMaxWidth().height(98.dp).zone(NexTvRadioFocus.Zone.Favourites)) {
+                    Glass(Modifier.fillMaxWidth().weight(1f).zone(NexTvRadioFocus.Zone.Favourites)) {
                         Column {
                             Label("♥  Favourite Stations", 13.sp, FontWeight.SemiBold, Color(0xFFFF6B8A))
                             if (favStations.isEmpty()) {
