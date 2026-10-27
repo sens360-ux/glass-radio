@@ -95,6 +95,7 @@ internal fun NexTvRadioScreen(
     val menuReq = remember { FocusRequester() }
     val playReq = remember { FocusRequester() }
     val favReq = remember { FocusRequester() }
+    val recentReq = remember { FocusRequester() }
     val rowReqs = remember { mutableMapOf<String, FocusRequester>() }
     fun rowReq(id: String): FocusRequester = rowReqs.getOrPut(id) { FocusRequester() }
     val listState = rememberLazyListState()
@@ -119,6 +120,7 @@ internal fun NexTvRadioScreen(
             NexTvRadioFocus.Zone.Menu -> menuReq.requestFocus()
             NexTvRadioFocus.Zone.Controls -> playReq.requestFocus()
             NexTvRadioFocus.Zone.Favourites -> favReq.requestFocus()
+            NexTvRadioFocus.Zone.Recent -> recentReq.requestFocus()
             NexTvRadioFocus.Zone.Stations -> {
                 val id = (current?.id ?: focusedStation)?.takeIf { key -> stations.any { it.id == key } } ?: stations.first().id
                 val index = stations.indexOfFirst { it.id == id }
@@ -143,6 +145,7 @@ internal fun NexTvRadioScreen(
         val to = NexTvRadioFocus.next(
             zone, dir, stations.isNotEmpty(), favStations.isNotEmpty(),
             NexTvRadioFocus.onFirstStation(stations.map { it.id }, focusedStation), focusedControl,
+            hasRecent = recentStations.isNotEmpty(),
         ) ?: return@onPreviewKeyEvent false
         to == zone || go(to)
     }
@@ -209,13 +212,18 @@ internal fun NexTvRadioScreen(
                     playReq, onToggle, onNext, onPrevious,
                 ) { focusedControl = it }
                 Column(Modifier.width(190.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Glass(Modifier.fillMaxWidth().weight(1f)) {
+                    Glass(Modifier.fillMaxWidth().weight(1f).zone(NexTvRadioFocus.Zone.Recent)) {
                         Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
                             Label("◷  Recently Played", 13.sp, FontWeight.SemiBold)
                             if (recentStations.isEmpty()) Label("Nothing played yet", 10.sp, color = Dim)
-                            recentStations.forEach { station ->
+                            recentStations.forEachIndexed { index, station ->
+                                var recentFocused by remember(station.id) { mutableStateOf(false) }
                                 Row(
-                                    Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                                    (if (index == 0) Modifier.focusRequester(recentReq) else Modifier)
+                                        .fillMaxWidth().onFocusChanged { recentFocused = it.isFocused }
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (recentFocused) Color(0x331E66D0) else Color.Transparent)
+                                        .border(if (recentFocused) 1.5.dp else 0.dp, if (recentFocused) Cyan else Color.Transparent, RoundedCornerShape(8.dp))
                                         .clickable { onPlay(station) }.padding(vertical = 3.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
