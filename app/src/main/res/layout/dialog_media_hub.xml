@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bg_glass_dialog"
+    android:paddingStart="28dp"
+    android:paddingEnd="28dp"
+    android:paddingTop="26dp"
+    android:paddingBottom="26dp"
+    android:gravity="center_horizontal"
+    android:elevation="20dp">
+
+    <!-- Top Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <ImageView
+            android:id="@+id/headerIcon"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_music"
+            android:tint="#1DB954" />
+
+        <TextView
+            android:id="@+id/headerTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="10dp"
+            android:text="NOW PLAYING"
+            android:textColor="#FFFFFFFF"
+            android:textSize="15sp"
+            android:fontFamily="@font/outfit"
+            android:fontVariationSettings="'wght' 700"
+            android:textStyle="bold"
+            android:letterSpacing="0.08" />
+
+        <TextView
+            android:id="@+id/badgeSource"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:background="@drawable/bg_dialog_btn"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:gravity="center"
+            android:text="SPOTIFY"
+            android:textColor="#1DB954"
+            android:textSize="12sp"
+            android:fontFamily="@font/outfit"
+            android:fontVariationSettings="'wght' 700"
+            android:textStyle="bold"
+            android:letterSpacing="0.04" />
+    </LinearLayout>
+
+    <!-- Hero Album Art -->
+    <FrameLayout
+        android:layout_width="120dp"
+        android:layout_height="120dp"
+        android:layout_marginTop="20dp"
+        android:layout_marginBottom="16dp">
+
+        <ImageView
+            android:id="@+id/imgAlbumArt"
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:background="@drawable/bg_media_app_pill"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_music"
+            android:padding="0dp" />
+    </FrameLayout>
+
+    <!-- Track Title -->
+    <TextView
+        android:id="@+id/txtTrackTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="Lagu Dimainkan"
+        android:textColor="#FFFFFFFF"
+        android:textSize="20sp"
+        android:fontFamily="@font/outfit"
+        android:fontVariationSettings="'wght' 700"
+        android:textStyle="bold"
+        android:singleLine="true"
+        android:ellipsize="marquee"
+        android:marqueeRepeatLimit="marquee_forever" />
+
+    <!-- Artist -->
+    <TextView
+        android:id="@+id/txtTrackArtist"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:gravity="center"
+        android:text="Artis"
+        android:textColor="#B3FFFFFF"
+        android:textSize="14sp"
+        android:fontFamily="@font/outfit"
+        android:fontVariationSettings="'wght' 500"
+        android:singleLine="true" />
+
+    <!-- Playback Status Capsule -->
+    <TextView
+        android:id="@+id/txtPlaybackStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:gravity="center"
+        android:text="▶ Sedang Dimainkan"
+        android:textColor="#1DB954"
+        android:textSize="12sp"
+        android:fontFamily="@font/outfit"
+        android:fontVariationSettings="'wght' 600"
+        android:letterSpacing="0.04" />
+
+    <!-- Frosted Glass Player Controls: Prev, Play/Pause, Next -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="22dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/btnPopupPrev"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:padding="10dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_skip_previous"
+            android:tint="@color/ic_np_tint"
+            android:focusable="true"
+            android:clickable="true"
+            android:background="@drawable/bg_np_round_btn"
+            android:nextFocusRight="@+id/btnPlayPause"
+            android:nextFocusDown="@+id/btnOpenApp" />
+
+        <ImageView
+            android:id="@+id/btnPlayPause"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:padding="13dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_pause"
+            android:tint="@color/ic_np_tint"
+            android:focusable="true"
+            android:clickable="true"
+            android:background="@drawable/bg_np_round_btn"
+            android:nextFocusLeft="@+id/btnPopupPrev"
+            android:nextFocusRight="@+id/btnPopupNext"
+            android:nextFocusDown="@+id/btnOpenApp" />
+
+        <ImageView
+            android:id="@+id/btnPopupNext"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:padding="10dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_skip_next"
+            android:tint="@color/ic_np_tint"
+            android:focusable="true"
+            android:clickable="true"
+            android:background="@drawable/bg_np_round_btn"
+            android:nextFocusLeft="@+id/btnPlayPause"
+            android:nextFocusDown="@+id/btnCloseDialog" />
+    </LinearLayout>
+
+    <!-- Bottom Action Buttons: Open App & Close/Disable -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:orientation="horizontal"
+        android:gravity="center">
+
+        <TextView
+            android:id="@+id/btnOpenApp"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="10dp"
+            android:background="@drawable/bg_dialog_btn"
+            android:textColor="@drawable/dialog_btn_text"
+            android:textSize="13sp"
+            android:fontFamily="@font/outfit"
+            android:fontVariationSettings="'wght' 600"
+            android:gravity="center"
+            android:focusable="true"
+            android:clickable="true"
+            android:text="Buka Spotify"
+            android:nextFocusUp="@+id/btnPlayPause"
+            android:nextFocusRight="@+id/btnCloseDialog" />
+
+        <TextView
+            android:id="@+id/btnCloseDialog"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_weight="1"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/bg_dialog_btn"
+            android:textColor="@drawable/dialog_btn_text"
+            android:textSize="13sp"
+            android:fontFamily="@font/outfit"
+            android:fontVariationSettings="'wght' 600"
+            android:gravity="center"
+            android:focusable="true"
+            android:clickable="true"
+            android:text="Tutup &amp; Hentikan"
+            android:nextFocusUp="@+id/btnPlayPause"
+            android:nextFocusLeft="@+id/btnOpenApp" />
+    </LinearLayout>
+</LinearLayout>

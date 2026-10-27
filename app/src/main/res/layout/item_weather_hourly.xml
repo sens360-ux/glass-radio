@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="62dp"
+    android:layout_height="84dp"
+    android:layout_marginStart="3dp"
+    android:layout_marginEnd="3dp"
+    android:orientation="vertical"
+    android:gravity="center_horizontal"
+    android:background="@drawable/weather_pill_bg"
+    android:paddingTop="5dp"
+    android:paddingBottom="6dp"
+    android:paddingStart="2dp"
+    android:paddingEnd="2dp"
+    android:focusable="true"
+    android:clickable="true">
+
+    <TextView
+        android:id="@+id/hourlyTime"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#E2E8F0"
+        android:textSize="11sp"
+        android:fontFamily="@font/outfit"
+        android:fontVariationSettings="'wght' 600"
+        android:includeFontPadding="false"
+        android:gravity="center"
+        android:singleLine="true" />
+
+    <ImageView
+        android:id="@+id/hourlyIcon"
+        android:layout_width="18dp"
+        android:layout_height="18dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="1dp"
+        android:scaleType="fitCenter" />
+
+    <TextView
+        android:id="@+id/hourlyRain"
+        android:layout_width="match_parent"
+        android:layout_height="12dp"
+        android:textColor="#38BDF8"
+        android:textSize="8.5sp"
+        android:fontFamily="@font/outfit"
+        android:fontVariationSettings="'wght' 700"
+        android:includeFontPadding="false"
+        android:gravity="center"
+        android:singleLine="true" />
+
+    <TextView
+        android:id="@+id/hourlyTemp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:textColor="#FFFFFF"
+        android:textSize="13sp"
+        android:fontFamily="@font/outfit"
+        android:fontVariationSettings="'wght' 700"
+        android:includeFontPadding="false"
+        android:gravity="center"
+        android:singleLine="true" />
+</LinearLayout>
