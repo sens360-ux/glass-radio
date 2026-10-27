@@ -105,9 +105,14 @@ internal fun NexTvRadioScreen(
     val recentStations = remember(stations, recent) { recent.mapNotNull { id -> stations.firstOrNull { it.id == id } }.take(3) }
     var clock by remember { mutableStateOf(ZonedDateTime.now(KL)) }
     LaunchedEffect(Unit) { while (true) { delay(30_000); clock = ZonedDateTime.now(KL) } }
-    LaunchedEffect(stations) {
+    var initialStationFocus by remember { mutableStateOf(false) }
+    LaunchedEffect(stations.isNotEmpty()) {
         withFrameNanos { }
-        runCatching { if (stations.isEmpty()) menuReq.requestFocus() else rowReq(stations.first().id).requestFocus() }
+        if (stations.isNotEmpty() && !initialStationFocus) {
+            runCatching { rowReq(stations.first().id).requestFocus() }.onSuccess { initialStationFocus = true }
+        } else if (stations.isEmpty() && !initialStationFocus) {
+            runCatching { menuReq.requestFocus() }
+        }
     }
     fun go(zone: NexTvRadioFocus.Zone): Boolean = runCatching {
         when (zone) {
