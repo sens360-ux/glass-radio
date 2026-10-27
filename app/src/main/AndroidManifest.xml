@@ -55,7 +55,7 @@
         android:allowBackup="false"
         android:localeConfig="@xml/locales_config">
 
-        <activity android:name=".RadioActivity" android:exported="false" android:screenOrientation="landscape" />
+        <activity android:name=".NexRadioActivity" android:exported="false" android:screenOrientation="landscape" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
