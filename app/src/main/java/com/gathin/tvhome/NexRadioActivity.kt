@@ -40,12 +40,13 @@ class NexRadioActivity:ComponentActivity(){
  override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState)
   engine=ExoPlayer.Builder(this).build()
   val prefs=getSharedPreferences("nexradio",MODE_PRIVATE)
+  val legacy=getSharedPreferences("RadioActivity",MODE_PRIVATE)
   setContent {
    var stations by remember { mutableStateOf<List<Station>>(emptyList()) }
    var selected by remember { mutableStateOf<Station?>(null) }
    var playing by remember { mutableStateOf(false) }
    var status by remember { mutableStateOf("Loading Malaysian stations…") }
-   var favourites by remember { mutableStateOf(prefs.getStringSet("favourites",emptySet())!!.toSet()) }
+   var favourites by remember { mutableStateOf((prefs.getStringSet("favourites",null) ?: legacy.getStringSet("favorites",emptySet()) ?: emptySet()).toSet()) }
    var recent by remember { mutableStateOf(prefs.getString("recent","")!!.split("\n").filter { it.isNotBlank() }) }
    fun fav(name:String){favourites=if(name in favourites) favourites-name else favourites+name;prefs.edit().putStringSet("favourites",favourites).apply()}
    fun play(s:Station){selected=s;status="Connecting…";recent=(listOf(s.name)+recent.filter { it!=s.name }).take(12);prefs.edit().putString("recent",recent.joinToString("\n")).apply()
@@ -119,6 +120,9 @@ class NexRadioActivity:ComponentActivity(){
        }
        Spacer(Modifier.height(15.dp))
        Text("FAVOURITES  ${favourites.size}    •    RECENTLY PLAYED  ${recent.size}",color=muted,fontSize=13.sp)
+       Spacer(Modifier.height(6.dp))
+       Text("♥  "+favourites.take(4).joinToString("   •   ").ifBlank { "Hold OK on a station to save it" },color=cyan,fontSize=12.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
+       Text("◷  "+recent.take(4).joinToString("   •   ").ifBlank { "No recently played stations" },color=muted,fontSize=12.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
       }
      }
      Spacer(Modifier.height(10.dp))
