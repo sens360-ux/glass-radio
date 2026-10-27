@@ -7,6 +7,13 @@ on:
     branches:
       - feature/nextv-radio-integration
 
+permissions:
+  contents: read
+
+concurrency:
+  group: glass-radio-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -24,10 +31,25 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Test NexTV radio focus navigation
+        run: |
+          chmod +x ./gradlew
+          ./gradlew testDebugUnitTest --stacktrace
+
       - name: Build Debug APK
         run: |
           chmod +x ./gradlew
           ./gradlew assembleDebug --stacktrace
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GlassTV-Build-Diagnostics
+          path: |
+            **/build/reports/tests/**
+            **/build/test-results/**
+          if-no-files-found: ignore
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
