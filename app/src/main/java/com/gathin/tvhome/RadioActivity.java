@@ -36,6 +36,10 @@ public class RadioActivity extends Activity {
     private final android.os.Handler uiHandler=new android.os.Handler(android.os.Looper.getMainLooper());
     private int artworkRequest=0;
     private boolean stationLongPressHandled=false;
+    private TextView waveform;
+    private final android.os.Handler waveHandler=new android.os.Handler(android.os.Looper.getMainLooper());
+    private int waveFrame=0;
+    private final Runnable waveAnimation=new Runnable(){@Override public void run(){if(waveform==null)return;StringBuilder bars=new StringBuilder();String[] levels={"▂","▃","▄","▅","▆","▇"};for(int i=0;i<28;i++){int level=(int)(3+2*Math.sin(i*0.83+waveFrame*0.36)+Math.sin(i*1.91-waveFrame*0.22));level=Math.max(0,Math.min(5,level));bars.append(playing?levels[level]:"▂").append(" ");}waveform.setText(bars.toString());waveFrame++;waveHandler.postDelayed(this,110);}};
     private Button playButton, favButton;
     private String[] current;
     private String filter="";
@@ -64,7 +68,7 @@ public class RadioActivity extends Activity {
         stationArtwork=new ImageView(this);stationArtwork.setScaleType(ImageView.ScaleType.FIT_CENTER);stationArtwork.setPadding(dp(14),dp(14),dp(14),dp(14));stationArtwork.setVisibility(View.GONE);artFrame.addView(stationArtwork,new android.widget.FrameLayout.LayoutParams(-1,-1));
         nowName=text("Choose your station",34,WHITE,true);nowName.setGravity(Gravity.CENTER);nowName.setSingleLine(true);nowName.setEllipsize(android.text.TextUtils.TruncateAt.END);LinearLayout.LayoutParams nameP=new LinearLayout.LayoutParams(-1,dp(58));nameP.topMargin=dp(8);center.addView(nowName,nameP);
         status=text("READY  •  DISCOVER MALAYSIAN RADIO",13,MUTED,false);status.setGravity(Gravity.CENTER);center.addView(status,new LinearLayout.LayoutParams(-1,dp(35)));
-        TextView wave=text("▂ ▅ ▃ ▆ ▄ ▇ ▂ ▅ ▃ ▆ ▄ ▇ ▂ ▅ ▃ ▆ ▄ ▇",29,CYAN,true);wave.setGravity(Gravity.CENTER);center.addView(wave,new LinearLayout.LayoutParams(-1,dp(56)));
+        waveform=text("▂ ▃ ▅ ▇ ▅ ▃ ▂ ▃ ▅ ▇ ▅ ▃",25,CYAN,true);waveform.setGravity(Gravity.CENTER);waveform.setSingleLine(true);center.addView(waveform,new LinearLayout.LayoutParams(-1,dp(56)));waveHandler.post(waveAnimation);
         LinearLayout controls=new LinearLayout(this);controls.setGravity(Gravity.CENTER);Button prev=button("⏮");playButton=button("▶  PLAY");Button next=button("⏭");controls.addView(prev,new LinearLayout.LayoutParams(0,dp(56),1));controls.addView(playButton,new LinearLayout.LayoutParams(0,dp(56),2));controls.addView(next,new LinearLayout.LayoutParams(0,dp(56),1));LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,dp(56));cp.topMargin=dp(15);center.addView(controls,cp);
         LinearLayout volumeRow=new LinearLayout(this);volumeRow.setGravity(Gravity.CENTER_VERTICAL);
         TextView volumeIcon=text("♫  VOLUME",12,MUTED,true);volumeRow.addView(volumeIcon,new LinearLayout.LayoutParams(dp(105),dp(38)));
@@ -132,5 +136,5 @@ public class RadioActivity extends Activity {
         }).start();
     }
     private void stopPlayer(){artworkRequest++;stationRequest++;playing=false;if(player!=null){player.release();player=null;}}
-    @Override protected void onDestroy(){stopPlayer();super.onDestroy();}
+    @Override protected void onDestroy(){waveHandler.removeCallbacks(waveAnimation);stopPlayer();super.onDestroy();}
 }
