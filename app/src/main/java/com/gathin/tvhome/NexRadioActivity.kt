@@ -47,6 +47,7 @@ class NexRadioActivity:ComponentActivity(){
    var stations by remember { mutableStateOf<List<Station>>(emptyList()) }
    var selected by remember { mutableStateOf<Station?>(null) }
    var playing by remember { mutableStateOf(false) }
+   var viewMode by remember { mutableStateOf("ALL") }
    var status by remember { mutableStateOf("Loading Malaysian stations…") }
    var favourites by remember { mutableStateOf((prefs.getStringSet("favourites",null) ?: legacy.getStringSet("favorites",emptySet()) ?: emptySet()).toSet()) }
    var recent by remember { mutableStateOf((prefs.getString("recent",null) ?: legacy.getString("recent","") ?: "").split("\n").filter { it.isNotBlank() }) }
@@ -59,7 +60,7 @@ class NexRadioActivity:ComponentActivity(){
     override fun onIsPlayingChanged(isPlaying:Boolean){playing=isPlaying}
    };engine?.addListener(listener);onDispose {engine?.removeListener(listener)}}
    val firstStationFocus=remember { FocusRequester() }
-   LaunchedEffect(stations.size){if(stations.isNotEmpty())firstStationFocus.requestFocus()}
+   LaunchedEffect(stations.size,viewMode){if(stations.isNotEmpty())runCatching { firstStationFocus.requestFocus() }}
    LaunchedEffect(Unit){stations=withContext(Dispatchers.IO){try{
     val connection=URL("https://de1.api.radio-browser.info/json/stations/bycountrycodeexact/MY?hidebroken=true&order=votes&reverse=true&limit=300").openConnection().apply { connectTimeout=12000;readTimeout=15000 }
     val arr=JSONArray(connection.getInputStream().bufferedReader().use { it.readText() })
@@ -79,12 +80,23 @@ class NexRadioActivity:ComponentActivity(){
        Text("RADIO STATIONS",color=white,fontSize=17.sp,fontWeight=FontWeight.Bold)
        Spacer(Modifier.height(8.dp))
        Text("${stations.size} stations  •  Hold OK to favourite",color=muted,fontSize=12.sp)
+       Spacer(Modifier.height(8.dp))
+       Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+        listOf("ALL","FAVOURITES","RECENT").forEach { mode ->
+         RadioControl(if(viewMode==mode)"• $mode" else mode){viewMode=mode}
+        }
+       }
        Spacer(Modifier.height(10.dp))
+       val visibleStations=when(viewMode) {
+        "FAVOURITES" -> stations.filter { it.name in favourites }
+        "RECENT" -> recent.mapNotNull { name -> stations.firstOrNull { it.name==name } }
+        else -> stations
+       }
        LazyColumn(verticalArrangement=Arrangement.spacedBy(7.dp)){
-        items(stations,key={it.name}){s->
+        items(visibleStations,key={it.name}){s->
          var focused by remember {mutableStateOf(false)}
          var held by remember {mutableStateOf(false)}
-         Row(Modifier.then(if(stations.firstOrNull()==s)Modifier.focusRequester(firstStationFocus) else Modifier).fillMaxWidth().height(54.dp).clip(RoundedCornerShape(13.dp))
+         Row(Modifier.then(if(visibleStations.firstOrNull()==s)Modifier.focusRequester(firstStationFocus) else Modifier).fillMaxWidth().height(54.dp).clip(RoundedCornerShape(13.dp))
           .background(if(focused||selected?.name==s.name)Color(0xFF135477) else Color(0xFF162942))
           .onFocusChanged{focused=it.isFocused}
           .onPreviewKeyEvent {ev->
