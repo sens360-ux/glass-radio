@@ -5,12 +5,12 @@ package com.gathin.tvhome
  * TV remote focus travels between the menu, stations, playback controls and favourites.
  */
 internal object NexTvRadioFocus {
-    enum class Zone { Menu, Stations, Controls, Favourites }
+    enum class Zone { Menu, Stations, Controls, Recent, Favourites }
     enum class Dir { Up, Down, Left, Right }
 
     fun next(
         zone: Zone, dir: Dir, hasStations: Boolean, hasFavourites: Boolean,
-        atTop: Boolean = true, control: Int = 1
+        atTop: Boolean = true, control: Int = 1, hasRecent: Boolean = false
     ): Zone? = when (zone) {
         Zone.Menu -> if (dir == Dir.Down) (if (hasStations) Zone.Stations else Zone.Controls) else null
         Zone.Stations -> when (dir) {
@@ -22,11 +22,17 @@ internal object NexTvRadioFocus {
         Zone.Controls -> when (dir) {
             Dir.Up -> Zone.Menu
             Dir.Left -> if (control > 0) null else if (hasStations) Zone.Stations else Zone.Controls
-            Dir.Right -> if (control < 2) null else if (hasFavourites) Zone.Favourites else Zone.Controls
+            Dir.Right -> if (control < 2) null else if (hasRecent) Zone.Recent else if (hasFavourites) Zone.Favourites else Zone.Controls
             Dir.Down -> Zone.Controls
         }
-        Zone.Favourites -> when (dir) {
+        Zone.Recent -> when (dir) {
             Dir.Up -> Zone.Menu
+            Dir.Down -> if (hasFavourites) Zone.Favourites else null
+            Dir.Left -> Zone.Controls
+            Dir.Right -> null
+        }
+        Zone.Favourites -> when (dir) {
+            Dir.Up -> if (hasRecent) Zone.Recent else Zone.Menu
             Dir.Left -> Zone.Controls
             else -> null
         }
