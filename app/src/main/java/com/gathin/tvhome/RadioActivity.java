@@ -6,8 +6,9 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.content.res.ColorStateList;
-import android.media.AudioAttributes;
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.AudioAttributes;
+import androidx.media3.common.C;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
@@ -27,6 +28,7 @@ public class RadioActivity extends Activity {
     private final LinkedHashSet<String> favorites=new LinkedHashSet<>();
     private final LinkedList<String> recent=new LinkedList<>();
     private ExoPlayer player;
+    private int stationRequest=0;
     private LinearLayout stationList, favoriteList, recentList;
     private TextView status, nowName, nowLogo, countLabel;
     private Button playButton, favButton;
@@ -40,7 +42,7 @@ public class RadioActivity extends Activity {
     private TextView text(String s,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setGravity(Gravity.CENTER_VERTICAL);if(bold)t.setTypeface(null,Typeface.BOLD);return t;}
     private LinearLayout column(){LinearLayout l=new LinearLayout(this);l.setOrientation(1);return l;}
     private void pad(View v,int x,int y){v.setPadding(dp(x),dp(y),dp(x),dp(y));}
-    private Button button(String s){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextColor(WHITE);b.setTextSize(15);b.setBackgroundTintList(ColorStateList.valueOf(0xff203c5b));b.setFocusable(true);b.setOnFocusChangeListener((v,f)->{b.setBackgroundTintList(ColorStateList.valueOf(f?0xff078bb8:0xff203c5b));b.setTextColor(f?Color.WHITE:WHITE);b.setScaleX(f?1.025f:1f);b.setScaleY(f?1.025f:1f);});return b;}
+    private Button button(String s){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextColor(WHITE);b.setTextSize(15);b.setSingleLine(true);b.setEllipsize(android.text.TextUtils.TruncateAt.END);b.setBackgroundTintList(ColorStateList.valueOf(0xff203c5b));b.setFocusable(true);b.setOnFocusChangeListener((v,f)->{b.setBackgroundTintList(ColorStateList.valueOf(f?0xff078bb8:0xff203c5b));b.setTextColor(f?Color.WHITE:WHITE);b.setScaleX(f?1.025f:1f);b.setScaleY(f?1.025f:1f);});return b;}
     private LinearLayout panel(String heading){LinearLayout p=column();pad(p,15,14);p.setBackground(bg(0xe0162c48,20));TextView h=text(heading,18,WHITE,true);p.addView(h,new LinearLayout.LayoutParams(-1,dp(38)));return p;}
     @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().getDecorView().setSystemUiVisibility(5894|1024|512);favorites.addAll(getPreferences(0).getStringSet("favorites",new HashSet<>()));
         recent.addAll(Arrays.asList(getPreferences(0).getString("recent","").split("\\n")));recent.removeIf(String::isEmpty);
@@ -74,7 +76,8 @@ public class RadioActivity extends Activity {
         else {player.play();playing=true;playButton.setText("Ⅱ  PAUSE");status.setText("● LIVE • "+current[0]);}
     }
     private void play(String[] s){
-        stopPlayer();current=s;nowName.setText(s[0]);
+        if(current!=null&&current[0].equals(s[0])&&player!=null){if(!player.isPlaying())player.play();return;}
+        current=s;nowName.setText(s[0]);
         nowLogo.setText(s[0].substring(0,Math.min(3,s[0].length())).toUpperCase(Locale.ROOT));
         status.setText("Connecting to "+s[0]+"...");playButton.setText("… CONNECTING");
         favButton.setText(favorites.contains(s[0])?"♥  REMOVE FAVOURITE":"♡  ADD TO FAVOURITES");
@@ -82,20 +85,22 @@ public class RadioActivity extends Activity {
         getPreferences(0).edit().putString("recent",android.text.TextUtils.join("\n",recent)).apply();
         renderSides();
         try{
-            ExoPlayer exo=new ExoPlayer.Builder(this).build();player=exo;
+            if(player==null){player=new ExoPlayer.Builder(this).build();player.setAudioAttributes(new AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),true);}
+            ExoPlayer exo=player;
+            final int request=++stationRequest;
             exo.addListener(new Player.Listener(){
                 @Override public void onPlaybackStateChanged(int state){
-                    if(player!=exo)return;
+                    if(player!=exo||request!=stationRequest)return;
                     if(state==Player.STATE_READY){playing=true;playButton.setText("Ⅱ  PAUSE");status.setText("● LIVE • "+s[0]);}
                     else if(state==Player.STATE_BUFFERING){status.setText("Buffering • "+s[0]);}
                 }
                 @Override public void onPlayerError(PlaybackException error){
-                    if(player==exo){playing=false;playButton.setText("▶  RETRY");status.setText("Stream unavailable • Try another station");}
+                    if(player==exo&&request==stationRequest){playing=false;playButton.setText("▶  RETRY");status.setText("Stream unavailable • Try another station");}
                 }
             });
-            exo.setMediaItem(MediaItem.fromUri(s[1]));exo.prepare();exo.play();
+            exo.stop();exo.clearMediaItems();exo.setMediaItem(MediaItem.fromUri(s[1]));exo.prepare();exo.play();
         }catch(Exception e){stopPlayer();status.setText("Unable to play this station");playButton.setText("▶  RETRY");}
     }
-    private void stopPlayer(){playing=false;if(player!=null){player.release();player=null;}}
+    private void stopPlayer(){stationRequest++;playing=false;if(player!=null){player.release();player=null;}}
     @Override protected void onDestroy(){stopPlayer();super.onDestroy();}
 }
