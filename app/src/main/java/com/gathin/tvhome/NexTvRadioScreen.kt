@@ -189,10 +189,10 @@ internal fun NexTvRadioScreen(
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(Brush.linearGradient(listOf(Cyan, Color(0xFF1E66D0)))), contentAlignment = Alignment.Center) {
-                    Label("N", 21.sp, FontWeight.ExtraBold, Bg)
+                    Label("G", 21.sp, FontWeight.ExtraBold, Bg)
                 }
                 Column(Modifier.padding(start = 8.dp)) {
-                    Row { Label("NexTV", 20.sp, FontWeight.ExtraBold); Label(" Radio", 20.sp, FontWeight.SemiBold, Cyan) }
+                    Row { Label("Glass TV", 20.sp, FontWeight.ExtraBold); Label(" Radio", 20.sp, FontWeight.SemiBold, Cyan) }
                     Label(sourceLabel, 8.sp, FontWeight.Medium, Dim)
                 }
                 Row(Modifier.weight(1f).zone(NexTvRadioFocus.Zone.Menu), horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)) {
@@ -287,7 +287,7 @@ internal fun NexTvRadioScreen(
                 Modifier.fillMaxWidth().height(34.dp).background(Color(0xCC050B1A)).padding(horizontal = 20.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Label("NexTV Radio", 12.sp, FontWeight.Bold)
+                Label("Glass TV Radio", 12.sp, FontWeight.Bold)
                 Label("OK  Play / Pause", 10.sp, color = Dim)
                 Label("▲▼  Stations", 10.sp, color = Dim)
                 Label("◀▶  Move", 10.sp, color = Dim)
