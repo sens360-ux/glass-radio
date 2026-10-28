@@ -111,12 +111,7 @@ class NexRadioActivity : ComponentActivity() {
                 message = "Connecting…"
                 recentIds = (listOf(s.id) + recentIds.filter { it != s.id }).take(12)
                 prefs.edit().putString("recent", recentIds.joinToString("\n")).apply()
-                // Use independently listed IKIM streams before older fixed endpoints.
-                // Keep directory entries hidden as duplicates in the station list.
-                val discovered = if (s.id == "featured-ikim")
-                    directoryStations.filter { stationKey(it.name) == "IKIM" }.map { it.stream }
-                else emptyList()
-                activeStreamUrls = (discovered + streamCandidates(s)).distinct()
+                activeStreamUrls = streamCandidates(s).distinct()
                 startStream(activeStreamUrls.first())
             }
             fun tryNextStream(reason: String) {
@@ -304,7 +299,7 @@ class NexRadioActivity : ComponentActivity() {
                 val json = connection.getInputStream().bufferedReader().use { it.readText() }
                 val combined = JSONArray(json)
                 // Fetch popular stations by name too: the country top-300 list can omit ERA/IKIM.
-                for (term in listOf("ERA", "IKIM")) {
+                for (term in listOf("ERA")) {
                     try {
                         val searchUrl = URL("https://$host/json/stations/byname/${java.net.URLEncoder.encode(term, "UTF-8")}?hidebroken=true&limit=50")
                         val searchConnection = searchUrl.openConnection().apply { connectTimeout = 5_000; readTimeout = 7_000 }
@@ -352,7 +347,7 @@ class NexRadioActivity : ComponentActivity() {
                 name.equals(keyword, true) || name.startsWith("$keyword ", true) ||
                     name.startsWith("$keyword-", true)
             }
-            if (chineseLanguage || chineseStationName) return@mapNotNull null
+            if (chineseLanguage || chineseStationName || isIkim(name)) return@mapNotNull null
             val stream = row.optString("url_resolved").ifBlank { row.optString("url") }.trim()
             if (name.isBlank() || !stream.startsWith("http", ignoreCase = true)) return@mapNotNull null
             val group = when {
@@ -377,9 +372,6 @@ class NexRadioActivity : ComponentActivity() {
         NexTvStation("featured-era", "ERA FM",
             "https://audio1.syok.my/era",
             tagline = "Muzik Hit Terkini", group = "Astro"),
-        NexTvStation("featured-ikim", "IKIM FM",
-            "https://ais-sa8.cdnstream1.com/5035",
-            tagline = "Inspirasi Utama Anda", group = "Others"),
     )
 
     /** Fixed station endpoints; discovered directory alternatives are added in play(). */
@@ -388,12 +380,11 @@ class NexRadioActivity : ComponentActivity() {
             "https://audio1.syok.my/era",
             "https://stream.rcs.revma.com/crec9cmbv4uvv",
         )
-        "featured-ikim" -> listOf(
-            "https://ais-sa8.cdnstream1.com/5035",
-            "https://ais-sa8.cdnstream1.com/5035/playlist.m3u8",
-        )
         else -> listOf(station.stream)
     }
+
+    private fun isIkim(name: String): Boolean = stationKey(name) == "IKIM" ||
+        name.contains(Regex("(?i)\\bIKIM\\s*FM\\b"))
 
     private fun stationKey(name: String): String {
         val cleaned = name.uppercase(java.util.Locale.ROOT)
@@ -419,6 +410,6 @@ class NexRadioActivity : ComponentActivity() {
                 popular.indexOfFirst { name == it || name.startsWith("$it ") || name.startsWith("$it FM") }
                     .let { if (it < 0) Int.MAX_VALUE else it }
             }.thenBy { it.name })
-        return featured + sorted.filter { station -> seen.add(stationKey(station.name)) }
+        return featured + sorted.filter { station -> !isIkim(station.name) && seen.add(stationKey(station.name)) }
     }
 }
