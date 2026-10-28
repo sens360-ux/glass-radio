@@ -47,7 +47,7 @@ class NexRadioActivity : ComponentActivity() {
         val legacy = getSharedPreferences("RadioActivity", MODE_PRIVATE)
 
         setContent {
-            var stations by remember { mutableStateOf<List<NexTvStation>>(emptyList()) }
+            var stations by remember { mutableStateOf<List<NexTvStation>>(featuredStations()) }
             var current by remember { mutableStateOf<NexTvStation?>(null) }
             var playing by remember { mutableStateOf(false) }
             var songTitle by remember { mutableStateOf<String?>(null) }
@@ -129,14 +129,14 @@ class NexRadioActivity : ComponentActivity() {
                     runCatching { parseDirectory(File(cacheDir, "nexradio-directory.json").readText()) }.getOrDefault(emptyList())
                 }
                 if (cached.isNotEmpty()) {
-                    stations = cached
+                    stations = mergeFeatured(cached)
                     message = null
                 }
                 val fresh = withContext(Dispatchers.IO) {
                     fetchDirectory(File(cacheDir, "nexradio-directory.json"))
                 }
                 if (fresh.isNotEmpty()) {
-                    stations = fresh
+                    stations = mergeFeatured(fresh)
                     if (current == null) message = null
                 } else if (cached.isEmpty()) {
                     message = "Radio directory unavailable. Check internet connection."
@@ -263,7 +263,7 @@ class NexRadioActivity : ComponentActivity() {
 
     private fun parseDirectory(json: String): List<NexTvStation> {
         val rows = JSONArray(json)
-        return (0 until rows.length()).mapNotNull { index ->
+        return mergeFeatured((0 until rows.length()).mapNotNull { index ->
             val row = rows.getJSONObject(index)
             val name = row.optString("name").trim()
             // Exclude Chinese-language stations from the Malaysian radio directory.
@@ -304,6 +304,25 @@ class NexRadioActivity : ComponentActivity() {
                 group = group,
                 bitrate = row.optInt("bitrate").takeIf { it > 0 },
             )
-        }.distinctBy { it.id }
+        }.distinctBy { it.id })
+    }
+
+    private fun featuredStations() = listOf(
+        NexTvStation("featured-era", "ERA FM",
+            "https://stream.rcs.revma.com/crec9cmbv4uvv/12_7yx6mmm02au702/playlist.m3u8",
+            tagline = "Muzik Hit Terkini", group = "Astro"),
+        NexTvStation("featured-ikim", "IKIM FM",
+            "https://ais-sa8.cdnstream1.com/5035",
+            tagline = "Inspirasi Utama Anda", group = "Others"),
+    )
+
+    private fun mergeFeatured(directory: List<NexTvStation>): List<NexTvStation> {
+        val featured = featuredStations()
+        return featured + directory.filterNot { station ->
+            station.name.trim().equals("ERA", true) ||
+                station.name.trim().equals("ERA FM", true) ||
+                station.name.trim().equals("IKIM", true) ||
+                station.name.trim().equals("IKIM FM", true)
+        }
     }
 }
