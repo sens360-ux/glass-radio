@@ -120,6 +120,9 @@ class NexRadioActivity : ComponentActivity() {
                     message = "Trying alternate stream…"
                     startStream(activeStreamUrls[streamAttempt])
                 } else {
+                    // A timed-out stream can remain BUFFERING without reporting an error.
+                    // Stop the exhausted attempt so it cannot unexpectedly start later.
+                    engine?.stop()
                     message = reason
                     playing = false
                 }
@@ -277,6 +280,15 @@ class NexRadioActivity : ComponentActivity() {
                     if (migratedRecent != recentIds) {
                         recentIds = migratedRecent
                         prefs.edit().putString("recent", recentIds.joinToString("\n")).apply()
+                    }
+                    // Remember the last station selection without autoplaying on launch.
+                    // OK resumes playback, with favourites and D-pad order unchanged.
+                    if (current == null) {
+                        recentIds.firstNotNullOfOrNull { id -> stations.firstOrNull { it.id == id } }?.let { last ->
+                            current = last
+                            activeStreamUrls = streamCandidates(last).distinct()
+                            streamAttempt = 0
+                        }
                     }
                 }
             }
