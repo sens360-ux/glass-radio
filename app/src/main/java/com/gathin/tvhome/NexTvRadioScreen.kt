@@ -97,6 +97,7 @@ internal fun NexTvRadioScreen(
 ) {
     val menuReq = remember { FocusRequester() }
     val playReq = remember { FocusRequester() }
+    val lyricsReq = remember { FocusRequester() }
     val favReq = remember { FocusRequester() }
     val recentReq = remember { FocusRequester() }
     val rowReqs = remember { mutableMapOf<String, FocusRequester>() }
@@ -177,6 +178,8 @@ internal fun NexTvRadioScreen(
                 Row(Modifier.weight(1f).zone(NexTvRadioFocus.Zone.Menu), horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)) {
                     MenuPill("Home", false, Modifier.focusRequester(menuReq), onHome)
                     MenuPill("Radio", true, Modifier, {})
+                    MenuPill(if (lyricsEnabled) "Lyrics: ON" else "Lyrics: OFF", false,
+                        Modifier.focusRequester(lyricsReq), onToggleLyrics)
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Label(clock.format(TimeFmt), 16.sp, FontWeight.SemiBold)
@@ -411,10 +414,8 @@ private fun NowPanel(
                         Label(if (message != null) message else "Pick a station", 20.sp, FontWeight.Bold, lines = 2)
                         Label("Choose one on the left and press OK.", 13.sp, color = Dim)
                     }
-                    Label(if (lyricsEnabled) "LYRICS ON · OK to toggle" else "LYRICS OFF · OK to toggle", 10.sp, color = CyanSoft,
-                        modifier = Modifier.padding(top = 8.dp).clickable(onClick = onToggleLyrics))
-                    if (lyricsEnabled) Label(lyricLine ?: "Lyrics unavailable", 14.sp, FontWeight.SemiBold, CyanSoft,
-                        modifier = Modifier.padding(top = 6.dp), lines = 2)
+                    if (lyricsEnabled && !lyricLine.isNullOrBlank()) Label(lyricLine, 16.sp, FontWeight.Bold, CyanSoft,
+                        modifier = Modifier.padding(top = 8.dp), lines = 2)
                     Equaliser(playing, Modifier.fillMaxWidth().height(30.dp).padding(top = 6.dp), Cyan.copy(alpha = 0.8f), 28)
                 }
             }
