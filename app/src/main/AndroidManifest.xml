@@ -9,6 +9,7 @@
 
     <!-- Only for the weekly pictures of places (PlaceWallpapers); "places": false keeps the launcher offline. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <!-- The azan at prayer time: one exact alarm for the next prayer that is switched on. -->
@@ -54,6 +55,13 @@
         android:largeHeap="true"
         android:allowBackup="false"
         android:localeConfig="@xml/locales_config">
+
+        <receiver android:name=".BootLaunchReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
         <activity android:name=".NexRadioActivity" android:exported="false" android:screenOrientation="landscape" />
         <activity
