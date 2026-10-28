@@ -4,15 +4,6 @@ import android.os.Bundle
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.*
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -55,14 +46,8 @@ class NexRadioActivity : ComponentActivity() {
         val prefs = getSharedPreferences("nexradio", MODE_PRIVATE)
         val legacy = getSharedPreferences("RadioActivity", MODE_PRIVATE)
 
-        val hub = NexTvHub(this)
         setContent {
-            var paired by remember { mutableStateOf(hub.token() != null) }
-            var pairingAttempt by remember { mutableIntStateOf(0) }
-            var usePublic by remember { mutableStateOf(hub.token() == null) }
-            var pairingCode by remember { mutableStateOf<String?>(null) }
-            var pairingMessage by remember { mutableStateOf("Connecting to NexTV Hub…") }
-            var stations by remember { mutableStateOf<List<NexTvStation>>(emptyList()) }
+            var stations by remember { mutableStateOf<List<NexTvStation>>(featuredStations()) }
             var current by remember { mutableStateOf<NexTvStation?>(null) }
             var playing by remember { mutableStateOf(false) }
             var songTitle by remember { mutableStateOf<String?>(null) }
@@ -85,11 +70,7 @@ class NexRadioActivity : ComponentActivity() {
 
             fun toggleFavourite(s: NexTvStation) {
                 favouriteIds = if (s.id in favouriteIds) favouriteIds - s.id else favouriteIds + s.id
-                val names = (prefs.getStringSet("favourite_station_names", emptySet()) ?: emptySet()).toMutableSet()
-                if (s.id in favouriteIds) names.add(stationKey(s.name))
-                else names.remove(stationKey(s.name))
-                prefs.edit().putStringSet("favourites", favouriteIds)
-                    .putStringSet("favourite_station_names", names).apply()
+                prefs.edit().putStringSet("favourites", favouriteIds).apply()
             }
             fun play(s: NexTvStation) {
                 current = s
@@ -99,11 +80,7 @@ class NexRadioActivity : ComponentActivity() {
                 lyricTimeline = emptyList()
                 message = "Connecting…"
                 recentIds = (listOf(s.id) + recentIds.filter { it != s.id }).take(12)
-                val previousNames = (prefs.getString("recent_names", "") ?: "").split("\n")
-                val recentNames = (listOf(stationKey(s.name)) + previousNames)
-                    .filter { it.isNotBlank() }.distinct().take(12)
-                prefs.edit().putString("recent", recentIds.joinToString("\n"))
-                    .putString("recent_names", recentNames.joinToString("\n")).apply()
+                prefs.edit().putString("recent", recentIds.joinToString("\n")).apply()
                 engine?.apply {
                     stop()
                     setMediaItem(MediaItem.fromUri(s.stream))
@@ -157,69 +134,22 @@ class NexRadioActivity : ComponentActivity() {
                 onDispose { engine?.removeListener(listener) }
             }
 
-            LaunchedEffect(paired, pairingAttempt, usePublic) {
-                if (usePublic) return@LaunchedEffect
-                if (!paired) {
-                    pairingCode = null
-                    pairingMessage = "Requesting NexTV Hub pairing code…"
-                    val result = withContext(Dispatchers.IO) { runCatching { hub.requestPairing() } }
-                    if (result.isFailure) {
-                        pairingMessage = "Hub connection failed: " + (result.exceptionOrNull()?.message ?: "Unknown error")
-                        usePublic = true
-                    } else {
-                        val (code, expiry) = result.getOrThrow()
-                        pairingCode = code
-                        pairingMessage = "Open hub.nexdata.my, sign in and approve this code"
-                        val started = android.os.SystemClock.elapsedRealtime()
-                        while (!paired && android.os.SystemClock.elapsedRealtime() - started < expiry * 1000L) {
-                            delay(3000)
-                            val poll = withContext(Dispatchers.IO) { runCatching { hub.pollPairing(code) } }
-                            val token = poll.getOrNull()
-                            if (!token.isNullOrBlank()) {
-                                if (hub.saveToken(token)) {
-                                    paired = true
-                                    pairingCode = null
-                                } else pairingMessage = "Cannot save pairing securely. Select Retry."
-                                break
-                            }
-                            if (poll.isFailure) { pairingMessage = "Pairing check failed: " + (poll.exceptionOrNull()?.message ?: "Unknown error"); usePublic = true; break }
-                        }
-                        if (!paired && pairingMessage.startsWith("Open ")) { pairingMessage = "Pairing expired."; usePublic = true }
-                    }
-                } else {
-                    message = "Loading stations from NexTV Hub…"
-                    val result = withContext(Dispatchers.IO) { runCatching { hub.radio() } }
-                    if (result.isSuccess) {
-                        stations = mergeFeatured(result.getOrThrow())
-                        message = if (stations.isEmpty()) "Hub returned no playable stations" else null
-                        if (stations.isEmpty()) usePublic = true
-                    } else {
-                        message = result.exceptionOrNull()?.message ?: "Hub radio unavailable"
-                        if (hub.token() == null) paired = false
-                        usePublic = true
-                    }
+            LaunchedEffect(Unit) {
+                val cached = withContext(Dispatchers.IO) {
+                    runCatching { parseDirectory(File(cacheDir, "nexradio-directory.json").readText()) }.getOrDefault(emptyList())
                 }
-            }
-
-            LaunchedEffect(usePublic) {
-                if (usePublic) {
-                    val cache = File(cacheDir, "glass_radio_my_directory.json")
-                    val cached = withContext(Dispatchers.IO) {
-                        runCatching { parseDirectory(cache.readText()) }.getOrDefault(emptyList())
-                    }
-                    if (cached.isNotEmpty()) {
-                        stations = cached
-                        message = null
-                    }
-                    val fresh = withContext(Dispatchers.IO) {
-                        runCatching { fetchDirectory(cache) }.getOrDefault(emptyList())
-                    }
-                    if (fresh.isNotEmpty()) {
-                        stations = fresh
-                        message = null
-                    } else if (stations.isEmpty()) {
-                        message = "Cannot load radio directory. Check Internet."
-                    }
+                if (cached.isNotEmpty()) {
+                    stations = mergeFeatured(cached)
+                    message = null
+                }
+                val fresh = withContext(Dispatchers.IO) {
+                    fetchDirectory(File(cacheDir, "nexradio-directory.json"))
+                }
+                if (fresh.isNotEmpty()) {
+                    stations = mergeFeatured(fresh)
+                    if (current == null) message = null
+                } else if (cached.isEmpty()) {
+                    message = "Radio directory unavailable. Check internet connection."
                 }
             }
 
@@ -259,20 +189,12 @@ class NexRadioActivity : ComponentActivity() {
             // Earlier Glass TV builds stored station names, not stable Radio Browser UUIDs.
             LaunchedEffect(stations) {
                 if (stations.isNotEmpty()) {
-                    val names = prefs.getStringSet("favourite_station_names", emptySet()) ?: emptySet()
-                    val migratedFavourites = (
-                        favouriteIds.map { key ->
-                            stations.firstOrNull { it.id == key || it.name == key }?.id ?: key
-                        } + stations.filter { stationKey(it.name) in names }.map { it.id }
-                    ).toSet()
-                    val recentNames = (prefs.getString("recent_names", "") ?: "")
-                        .split("\n").filter { it.isNotBlank() }
-                    val mappedRecent = recentNames.mapNotNull { key ->
-                        stations.firstOrNull { stationKey(it.name) == key }?.id
-                    }
-                    val migratedRecent = (mappedRecent + recentIds.map { key ->
+                    val migratedFavourites = favouriteIds.map { key ->
                         stations.firstOrNull { it.id == key || it.name == key }?.id ?: key
-                    }).distinct().take(12)
+                    }.toSet()
+                    val migratedRecent = recentIds.map { key ->
+                        stations.firstOrNull { it.id == key || it.name == key }?.id ?: key
+                    }.distinct()
                     if (migratedFavourites != favouriteIds) {
                         favouriteIds = migratedFavourites
                         prefs.edit().putStringSet("favourites", favouriteIds).apply()
@@ -284,25 +206,6 @@ class NexRadioActivity : ComponentActivity() {
                 }
             }
 
-            if (!paired && !usePublic) {
-                androidx.compose.foundation.layout.Column(
-                    modifier = Modifier.fillMaxSize().padding(48.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("Pair Glass TV with NexTV Hub", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(20.dp))
-                    Text(pairingCode ?: "Waiting for pairing code…", color = Color.White, fontSize = 24.sp)
-                    Spacer(Modifier.height(12.dp))
-                    Text(pairingMessage, color = Color.White, fontSize = 18.sp)
-                    Spacer(Modifier.height(24.dp))
-                    Button(onClick = { pairingCode = null; pairingMessage = "Retrying…"; pairingAttempt++ }) { Text("Retry pairing") }
-                    Spacer(Modifier.height(12.dp))
-                    Button(onClick = { usePublic = true }) { Text("Listen without Hub") }
-                    Spacer(Modifier.height(12.dp))
-                    Button(onClick = { finish() }) { Text("Back") }
-                }
-            } else {
             NexTvRadioScreen(
                 stations = stations,
                 current = current,
@@ -315,8 +218,6 @@ class NexRadioActivity : ComponentActivity() {
                 onToggleLyrics = { lyricsEnabled = !lyricsEnabled; prefs.edit().putBoolean("lyrics_enabled", lyricsEnabled).apply() },
                 favourites = favouriteIds,
                 recent = recentIds,
-                sourceLabel = if (usePublic) "Public radio directory" else "NexTV Hub",
-                onHub = { usePublic = false; paired = false; pairingAttempt++ },
                 onPlay = ::play,
                 onToggle = ::toggle,
                 onNext = { step(1) },
@@ -324,7 +225,6 @@ class NexRadioActivity : ComponentActivity() {
                 onFavourite = ::toggleFavourite,
                 onHome = { finish() },
             )
-            }
         }
     }
 
@@ -435,10 +335,10 @@ class NexRadioActivity : ComponentActivity() {
     }
 
     private fun mergeFeatured(directory: List<NexTvStation>): List<NexTvStation> {
-        val featured = emptyList<NexTvStation>()
+        val featured = featuredStations()
         val popular = listOf("HOT FM", "SINAR", "SURIA", "HITZ", "GEGAR", "RADIO KLASIK", "ZAYAN", "MIX", "FLY FM", "LITE", "BEST FM", "KOOL 101", "NASIONAL FM", "CATS FM", "RAAGA")
         val featuredKeys = featured.map { stationKey(it.name) }.toSet()
-        val seen = mutableSetOf<String>()
+        val seen = featuredKeys.toMutableSet()
         val sorted = directory.filterNot { stationKey(it.name) in featuredKeys }
             .sortedWith(compareBy<NexTvStation> { station ->
                 val name = station.name.uppercase(java.util.Locale.ROOT)
