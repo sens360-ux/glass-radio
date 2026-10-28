@@ -433,17 +433,12 @@ private fun NowPanel(
                             .padding(8.dp)) {
                             Label("LYRICS", 10.sp, FontWeight.Bold, CyanSoft)
                             val lines = remember(fullLyrics) { fullLyrics.lines().filter { it.isNotBlank() } }
-                            val active = lines.indexOfFirst { it.trim() == lyricLine?.trim() }
                             val lyricListState = rememberLazyListState()
-                            LaunchedEffect(active, fullLyrics) {
-                                if (active >= 0) lyricListState.animateScrollToItem(active)
-                            }
                             LazyColumn(Modifier.fillMaxWidth().heightIn(max = 130.dp), state = lyricListState,
                                 verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                 itemsIndexed(lines) { index, line ->
                                     Label(line, 12.sp,
-                                        if (index == active) FontWeight.Bold else FontWeight.Normal,
-                                        if (index == active) CyanSoft else Dim, lines = 3)
+                                        FontWeight.Normal, Dim, lines = 3)
                                 }
                             }
                         }
