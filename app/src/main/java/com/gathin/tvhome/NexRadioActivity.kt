@@ -55,6 +55,7 @@ class NexRadioActivity : ComponentActivity() {
         val hub = NexTvHub(this)
         setContent {
             var paired by remember { mutableStateOf(hub.token() != null) }
+            var pairingAttempt by remember { mutableIntStateOf(0) }
             var pairingCode by remember { mutableStateOf<String?>(null) }
             var pairingMessage by remember { mutableStateOf("Connecting to NexTV Hub…") }
             var stations by remember { mutableStateOf<List<NexTvStation>>(emptyList()) }
@@ -144,7 +145,7 @@ class NexRadioActivity : ComponentActivity() {
                 onDispose { engine?.removeListener(listener) }
             }
 
-            LaunchedEffect(paired) {
+            LaunchedEffect(paired, pairingAttempt) {
                 if (!paired) {
                     pairingCode = null
                     pairingMessage = "Requesting NexTV Hub pairing code…"
@@ -249,7 +250,7 @@ class NexRadioActivity : ComponentActivity() {
                     Spacer(Modifier.height(12.dp))
                     Text(pairingMessage)
                     Spacer(Modifier.height(24.dp))
-                    Button(onClick = { pairingCode = null; pairingMessage = "Retrying…"; paired = true; paired = false }) { Text("Retry pairing") }
+                    Button(onClick = { pairingCode = null; pairingMessage = "Retrying…"; pairingAttempt++ }) { Text("Retry pairing") }
                     Spacer(Modifier.height(12.dp))
                     Button(onClick = { finish() }) { Text("Back") }
                 }
@@ -384,7 +385,7 @@ class NexRadioActivity : ComponentActivity() {
     }
 
     private fun mergeFeatured(directory: List<NexTvStation>): List<NexTvStation> {
-        val featured = featuredStations()
+        val featured = emptyList<NexTvStation>()
         val popular = listOf("HOT FM", "SINAR", "SURIA", "HITZ", "GEGAR", "RADIO KLASIK", "ZAYAN", "MIX", "FLY FM", "LITE", "BEST FM", "KOOL 101", "NASIONAL FM", "CATS FM", "RAAGA")
         val featuredKeys = featured.map { stationKey(it.name) }.toSet()
         val seen = mutableSetOf<String>()
