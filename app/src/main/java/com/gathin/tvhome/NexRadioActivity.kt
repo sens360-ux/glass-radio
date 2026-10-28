@@ -244,10 +244,16 @@ class NexRadioActivity : ComponentActivity() {
             LaunchedEffect(stations) {
                 if (stations.isNotEmpty()) {
                     val migratedFavourites = favouriteIds.map { key ->
-                        stations.firstOrNull { it.id == key || it.name == key }?.id ?: key
+                        stations.firstOrNull { it.id == key || it.name == key }?.id
+                            ?: directoryStations.firstOrNull { it.id == key || it.name == key }?.let { oldStation ->
+                                stations.firstOrNull { stationKey(it.name) == stationKey(oldStation.name) }?.id
+                            } ?: key
                     }.toSet()
                     val migratedRecent = recentIds.map { key ->
-                        stations.firstOrNull { it.id == key || it.name == key }?.id ?: key
+                        stations.firstOrNull { it.id == key || it.name == key }?.id
+                            ?: directoryStations.firstOrNull { it.id == key || it.name == key }?.let { oldStation ->
+                                stations.firstOrNull { stationKey(it.name) == stationKey(oldStation.name) }?.id
+                            } ?: key
                     }.distinct()
                     if (migratedFavourites != favouriteIds) {
                         favouriteIds = migratedFavourites
@@ -298,7 +304,7 @@ class NexRadioActivity : ComponentActivity() {
                 val connection = url.openConnection().apply { connectTimeout = 8_000; readTimeout = 12_000 }
                 val json = connection.getInputStream().bufferedReader().use { it.readText() }
                 val combined = JSONArray(json)
-                // Fetch popular stations by name too: the country top-300 list can omit ERA/IKIM.
+                // Fetch ERA by name too: the country top-300 list can omit it.
                 for (term in listOf("ERA")) {
                     try {
                         val searchUrl = URL("https://$host/json/stations/byname/${java.net.URLEncoder.encode(term, "UTF-8")}?hidebroken=true&limit=50")
@@ -374,7 +380,7 @@ class NexRadioActivity : ComponentActivity() {
             tagline = "Muzik Hit Terkini", group = "Astro"),
     )
 
-    /** Fixed station endpoints; discovered directory alternatives are added in play(). */
+    /** Fixed ERA endpoints; other stations use their directory stream. */
     private fun streamCandidates(station: NexTvStation): List<String> = when (station.id) {
         "featured-era" -> listOf(
             "https://audio1.syok.my/era",
@@ -390,11 +396,11 @@ class NexRadioActivity : ComponentActivity() {
         val cleaned = name.uppercase(java.util.Locale.ROOT)
             .replace(Regex("\\b(FM|RADIO|MALAYSIA)\\b"), " ")
             .replace(Regex("[^A-Z0-9]+"), " ").trim()
-        return when (cleaned) {
-            "ERA", "ERA JE", "ERA KUALA LUMPUR", "ERA 103 3" -> "ERA"
-            "IKIM", "IKIM KUALA LUMPUR", "IKIMFM" -> "IKIM"
-            "HOT" -> "HOT"
-            "THR GEGAR", "GEGAR" -> "GEGAR"
+        return when {
+            cleaned == "ERA" || cleaned == "ERA JE" || cleaned == "ERA KUALA LUMPUR" || cleaned == "ERA 103 3" -> "ERA"
+            cleaned == "IKIM" || cleaned == "IKIM KUALA LUMPUR" || cleaned == "IKIMFM" -> "IKIM"
+            cleaned == "HOT" -> "HOT"
+            Regex("(?:^|\\s)(?:THR\\s+)?GEGAR(?:\\s|$)").containsMatchIn(cleaned) -> "GEGAR"
             else -> cleaned
         }
     }
