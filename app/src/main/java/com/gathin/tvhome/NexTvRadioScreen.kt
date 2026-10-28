@@ -84,6 +84,7 @@ internal fun NexTvRadioScreen(
     songArtist: String?,
     message: String?,
     lyricLine: String?,
+    fullLyrics: String?,
     lyricsEnabled: Boolean,
     onToggleLyrics: () -> Unit,
     favourites: Set<String>,
@@ -214,7 +215,7 @@ internal fun NexTvRadioScreen(
                     }
                 }
                 NowPanel(
-                    current, playing, songTitle, songArtist, message, lyricLine, lyricsEnabled, onToggleLyrics,
+                    current, playing, songTitle, songArtist, message, lyricLine, fullLyrics, lyricsEnabled, onToggleLyrics,
                     Modifier.weight(1f).fillMaxHeight().zone(NexTvRadioFocus.Zone.Controls),
                     playReq, onToggle, onNext, onPrevious,
                 ) { focusedControl = it }
@@ -389,7 +390,7 @@ private fun StationTile(
 @Composable
 private fun NowPanel(
     current: NexTvStation?, playing: Boolean, songTitle: String?, songArtist: String?, message: String?,
-    lyricLine: String?, lyricsEnabled: Boolean, onToggleLyrics: () -> Unit,
+    lyricLine: String?, fullLyrics: String?, lyricsEnabled: Boolean, onToggleLyrics: () -> Unit,
     modifier: Modifier, playReq: FocusRequester,
     onToggle: () -> Unit, onNext: () -> Unit, onPrevious: () -> Unit, onControlFocus: (Int) -> Unit,
 ) {
@@ -424,13 +425,27 @@ private fun NowPanel(
                         Label(if (message != null) message else "Pick a station", 20.sp, FontWeight.Bold, lines = 2)
                         Label("Choose one on the left and press OK.", 13.sp, color = Dim)
                     }
-                    if (playing && lyricsEnabled && !lyricLine.isNullOrBlank()) {
-                        Box(Modifier.fillMaxWidth().padding(top = 12.dp)
+                    if (playing && lyricsEnabled && !fullLyrics.isNullOrBlank()) {
+                        Column(Modifier.fillMaxWidth().padding(top = 8.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .background(Color(0xDD0B1A33))
-                            .border(1.dp, Cyan.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 12.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
-                            Label(lyricLine, 19.sp, FontWeight.Bold, CyanSoft, lines = 3)
+                            .border(1.dp, Cyan.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                            .padding(8.dp)) {
+                            Label("LYRICS", 10.sp, FontWeight.Bold, CyanSoft)
+                            val lines = remember(fullLyrics) { fullLyrics.lines().filter { it.isNotBlank() } }
+                            val active = lines.indexOfFirst { it.trim() == lyricLine?.trim() }
+                            val lyricListState = rememberLazyListState()
+                            LaunchedEffect(active, fullLyrics) {
+                                if (active >= 0) lyricListState.animateScrollToItem(active)
+                            }
+                            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 130.dp), state = lyricListState,
+                                verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                itemsIndexed(lines) { index, line ->
+                                    Label(line, 12.sp,
+                                        if (index == active) FontWeight.Bold else FontWeight.Normal,
+                                        if (index == active) CyanSoft else Dim, lines = 3)
+                                }
+                            }
                         }
                     }
                     Equaliser(playing, Modifier.fillMaxWidth().height(30.dp).padding(top = 6.dp), Cyan.copy(alpha = 0.8f), 28)
