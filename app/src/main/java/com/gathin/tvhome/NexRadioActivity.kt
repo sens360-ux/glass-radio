@@ -147,7 +147,8 @@ class NexRadioActivity : ComponentActivity() {
             }
 
             LaunchedEffect(paired, pairingAttempt, usePublic) {
-                if (!paired && !usePublic) {
+                if (usePublic) return@LaunchedEffect
+                if (!paired) {
                     pairingCode = null
                     pairingMessage = "Requesting NexTV Hub pairing code…"
                     val result = withContext(Dispatchers.IO) { runCatching { hub.requestPairing() } }
