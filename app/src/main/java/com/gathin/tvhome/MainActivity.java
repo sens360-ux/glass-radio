@@ -919,7 +919,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
 
         // Silent background update check after 5 seconds on launch
-        handler.postDelayed(() -> AppUpdateManager.checkForUpdates(this, false), 5000);
+        // Automatic app update checks disabled.
 
         if (getIntent() != null && getIntent().getBooleanExtra("open_settings", false)) {
             handler.postDelayed(() -> {
