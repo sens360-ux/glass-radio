@@ -163,12 +163,7 @@ class NexRadioActivity : ComponentActivity() {
                             }
                             val raw = JSONObject(conn.getInputStream().bufferedReader().use { it.readText() })
                                 .optString("syncedLyrics")
-                            Regex("""\[(\d+):(\d+(?:\.\d+)?)\](.*)""").findAll(raw).mapNotNull {
-                                val words = it.groupValues[3].trim()
-                                if (words.isEmpty()) null else
-                                    (it.groupValues[1].toLong() * 60000L +
-                                        (it.groupValues[2].toDouble() * 1000).toLong()) to words
-                            }.toList()
+                            NexTvLyrics.parseSyncedLrc(raw)
                         }.getOrDefault(emptyList())
                     }
                 }
