@@ -89,7 +89,6 @@ internal fun NexTvRadioScreen(
     favourites: Set<String>,
     recent: List<String>,
     sourceLabel: String,
-    onHub: () -> Unit,
     onPlay: (NexTvStation) -> Unit,
     onToggle: () -> Unit,
     onNext: () -> Unit,
@@ -180,7 +179,6 @@ internal fun NexTvRadioScreen(
                 Row(Modifier.weight(1f).zone(NexTvRadioFocus.Zone.Menu), horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)) {
                     MenuPill("Home", false, Modifier.focusRequester(menuReq), onHome)
                     MenuPill("Radio", true, Modifier, {})
-                    MenuPill("Hub", false, Modifier, onHub)
                     MenuPill(if (lyricsEnabled) "Lyrics: ON" else "Lyrics: OFF", false,
                         Modifier.focusRequester(lyricsReq), onToggleLyrics)
                 }
