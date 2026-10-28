@@ -360,18 +360,26 @@ class NexRadioActivity : ComponentActivity() {
             tagline = "Inspirasi Utama Anda", group = "Others"),
     )
 
-    /** Direct audio endpoints, not browser player pages. Retry only after an actual player error. */
-    private fun streamCandidates(station: NexTvStation): List<String> = when (station.id) {
-        "featured-era" -> listOf(
-            "https://audio1.syok.my/era",
-            "https://stream.rcs.revma.com/crec9cmbv4uvv",
-            "https://stream.rcs.revma.com/crec9cmbv4uvv/14_1mxuqy6p1izr902/playlist.m3u8",
-        )
-        "featured-ikim" -> listOf(
-            "https://ais-sa8.cdnstream1.com/5035",
-            "https://ais-sa8.cdnstream1.com/5035/playlist.m3u8",
-        )
-        else -> listOf(station.stream)
+    /** Prefer direct sources; use live Radio Browser directory URLs as fallbacks for IKIM. */
+    private fun streamCandidates(station: NexTvStation): List<String> {
+        val direct = when (station.id) {
+            "featured-era" -> listOf(
+                "https://audio1.syok.my/era",
+                "https://stream.rcs.revma.com/crec9cmbv4uvv",
+            )
+            "featured-ikim" -> listOf(
+                "https://ais-sa8.cdnstream1.com/5035",
+                "https://ais-sa8.cdnstream1.com/5035/playlist.m3u8",
+            )
+            else -> listOf(station.stream)
+        }
+        if (station.id != "featured-ikim") return direct.distinct()
+        val directoryStreams = runCatching {
+            parseDirectory(File(cacheDir, "nexradio-directory.json").readText())
+                .filter { stationKey(it.name) == "IKIM" }
+                .map { it.stream }
+        }.getOrDefault(emptyList())
+        return (directoryStreams + direct).filter { it.startsWith("https://") || it.startsWith("http://") }.distinct()
     }
 
     private fun stationKey(name: String): String {
