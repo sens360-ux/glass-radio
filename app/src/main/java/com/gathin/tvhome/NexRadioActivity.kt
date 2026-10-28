@@ -318,11 +318,16 @@ class NexRadioActivity : ComponentActivity() {
 
     private fun mergeFeatured(directory: List<NexTvStation>): List<NexTvStation> {
         val featured = featuredStations()
+        val popular = listOf("HOT FM", "SINAR", "SURIA", "HITZ", "GEGAR", "RADIO KLASIK", "ZAYAN", "MIX", "FLY FM", "LITE", "BEST FM", "KOOL 101", "NASIONAL FM", "CATS FM", "RAAGA")
         return featured + directory.filterNot { station ->
             station.name.trim().equals("ERA", true) ||
                 station.name.trim().equals("ERA FM", true) ||
                 station.name.trim().equals("IKIM", true) ||
                 station.name.trim().equals("IKIM FM", true)
-        }
+        }.sortedWith(compareBy<NexTvStation> { station ->
+            val name = station.name.uppercase(java.util.Locale.ROOT)
+            popular.indexOfFirst { name == it || name.startsWith("$it ") || name.startsWith("$it FM") }
+                .let { if (it < 0) Int.MAX_VALUE else it }
+        }.thenBy { it.name })
     }
 }
