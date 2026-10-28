@@ -83,6 +83,9 @@ internal fun NexTvRadioScreen(
     songTitle: String?,
     songArtist: String?,
     message: String?,
+    lyricLine: String?,
+    lyricsEnabled: Boolean,
+    onToggleLyrics: () -> Unit,
     favourites: Set<String>,
     recent: List<String>,
     onPlay: (NexTvStation) -> Unit,
@@ -207,7 +210,7 @@ internal fun NexTvRadioScreen(
                     }
                 }
                 NowPanel(
-                    current, playing, songTitle, songArtist, message,
+                    current, playing, songTitle, songArtist, message, lyricLine, lyricsEnabled, onToggleLyrics,
                     Modifier.weight(1f).fillMaxHeight().zone(NexTvRadioFocus.Zone.Controls),
                     playReq, onToggle, onNext, onPrevious,
                 ) { focusedControl = it }
@@ -373,6 +376,7 @@ private fun StationTile(
 @Composable
 private fun NowPanel(
     current: NexTvStation?, playing: Boolean, songTitle: String?, songArtist: String?, message: String?,
+    lyricLine: String?, lyricsEnabled: Boolean, onToggleLyrics: () -> Unit,
     modifier: Modifier, playReq: FocusRequester,
     onToggle: () -> Unit, onNext: () -> Unit, onPrevious: () -> Unit, onControlFocus: (Int) -> Unit,
 ) {
@@ -407,7 +411,11 @@ private fun NowPanel(
                         Label(if (message != null) message else "Pick a station", 20.sp, FontWeight.Bold, lines = 2)
                         Label("Choose one on the left and press OK.", 13.sp, color = Dim)
                     }
-                    Equaliser(playing, Modifier.fillMaxWidth().height(46.dp).padding(top = 10.dp), Cyan.copy(alpha = 0.8f), 28)
+                    Label(if (lyricsEnabled) "LYRICS ON · OK to toggle" else "LYRICS OFF · OK to toggle", 10.sp, color = CyanSoft,
+                        modifier = Modifier.padding(top = 8.dp).clickable(onClick = onToggleLyrics))
+                    if (lyricsEnabled) Label(lyricLine ?: "Lyrics unavailable", 14.sp, FontWeight.SemiBold, CyanSoft,
+                        modifier = Modifier.padding(top = 6.dp), lines = 2)
+                    Equaliser(playing, Modifier.fillMaxWidth().height(30.dp).padding(top = 6.dp), Cyan.copy(alpha = 0.8f), 28)
                 }
             }
             Row(
