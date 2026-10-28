@@ -16,6 +16,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -105,7 +106,9 @@ internal fun NexTvRadioScreen(
     val rowReqs = remember { mutableMapOf<String, FocusRequester>() }
     fun rowReq(id: String): FocusRequester = rowReqs.getOrPut(id) { FocusRequester() }
     val listState = rememberLazyListState()
+    val lyricScrollState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    LaunchedEffect(fullLyrics) { lyricScrollState.scrollToItem(0) }
     var focusedStation by remember { mutableStateOf<String?>(null) }
     var focusedControl by remember { mutableIntStateOf(1) }
     val favStations = remember(stations, favourites) { stations.filter { it.id in favourites } }
@@ -147,6 +150,21 @@ internal fun NexTvRadioScreen(
             Key.DirectionLeft -> NexTvRadioFocus.Dir.Left
             Key.DirectionRight -> NexTvRadioFocus.Dir.Right
             else -> return@onPreviewKeyEvent false
+        }
+        // Let the TV remote scroll lyrics manually; no simulated radio timing.
+        if (zone == NexTvRadioFocus.Zone.Controls && lyricsEnabled && !fullLyrics.isNullOrBlank()) {
+            if (dir == NexTvRadioFocus.Dir.Down) {
+                scope.launch {
+                    val last = (lyricScrollState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                    lyricScrollState.animateScrollToItem((lyricScrollState.firstVisibleItemIndex + 2).coerceAtMost(last))
+                }
+                return@onPreviewKeyEvent true
+            }
+            if (dir == NexTvRadioFocus.Dir.Up &&
+                (lyricScrollState.firstVisibleItemIndex > 0 || lyricScrollState.firstVisibleItemScrollOffset > 0)) {
+                scope.launch { lyricScrollState.animateScrollToItem((lyricScrollState.firstVisibleItemIndex - 2).coerceAtLeast(0)) }
+                return@onPreviewKeyEvent true
+            }
         }
         val to = NexTvRadioFocus.next(
             zone, dir, stations.isNotEmpty(), favStations.isNotEmpty(),
@@ -216,6 +234,7 @@ internal fun NexTvRadioScreen(
                 }
                 NowPanel(
                     current, playing, songTitle, songArtist, message, lyricLine, fullLyrics, lyricsEnabled, onToggleLyrics,
+                    lyricScrollState,
                     Modifier.weight(1f).fillMaxHeight().zone(NexTvRadioFocus.Zone.Controls),
                     playReq, onToggle, onNext, onPrevious,
                 ) { focusedControl = it }
@@ -391,6 +410,7 @@ private fun StationTile(
 private fun NowPanel(
     current: NexTvStation?, playing: Boolean, songTitle: String?, songArtist: String?, message: String?,
     lyricLine: String?, fullLyrics: String?, lyricsEnabled: Boolean, onToggleLyrics: () -> Unit,
+    lyricsScrollState: LazyListState,
     modifier: Modifier, playReq: FocusRequester,
     onToggle: () -> Unit, onNext: () -> Unit, onPrevious: () -> Unit, onControlFocus: (Int) -> Unit,
 ) {
@@ -431,10 +451,12 @@ private fun NowPanel(
                             .background(Color(0xDD0B1A33))
                             .border(1.dp, Cyan.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
                             .padding(8.dp)) {
-                            Label("LYRICS", 10.sp, FontWeight.Bold, CyanSoft)
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Label("FULL LYRICS", 10.sp, FontWeight.Bold, CyanSoft)
+                                Label("D-pad ↑↓ to scroll", 9.sp, color = Dim)
+                            }
                             val lines = remember(fullLyrics) { fullLyrics.lines().filter { it.isNotBlank() } }
-                            val lyricListState = rememberLazyListState()
-                            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 130.dp), state = lyricListState,
+                            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 130.dp), state = lyricsScrollState,
                                 verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                 itemsIndexed(lines) { index, line ->
                                     Label(line, 12.sp,
