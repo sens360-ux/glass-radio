@@ -311,18 +311,30 @@ class NexRadioActivity : ComponentActivity() {
             tagline = "Inspirasi Utama Anda", group = "Others"),
     )
 
+    private fun stationKey(name: String): String {
+        val cleaned = name.uppercase(java.util.Locale.ROOT)
+            .replace(Regex("\\b(FM|RADIO|MALAYSIA)\\b"), " ")
+            .replace(Regex("[^A-Z0-9]+"), " ").trim()
+        return when (cleaned) {
+            "ERA", "ERA JE" -> "ERA"
+            "IKIM" -> "IKIM"
+            "HOT" -> "HOT"
+            "THR GEGAR", "GEGAR" -> "GEGAR"
+            else -> cleaned
+        }
+    }
+
     private fun mergeFeatured(directory: List<NexTvStation>): List<NexTvStation> {
         val featured = featuredStations()
         val popular = listOf("HOT FM", "SINAR", "SURIA", "HITZ", "GEGAR", "RADIO KLASIK", "ZAYAN", "MIX", "FLY FM", "LITE", "BEST FM", "KOOL 101", "NASIONAL FM", "CATS FM", "RAAGA")
-        return featured + directory.filterNot { station ->
-            station.name.trim().equals("ERA", true) ||
-                station.name.trim().equals("ERA FM", true) ||
-                station.name.trim().equals("IKIM", true) ||
-                station.name.trim().equals("IKIM FM", true)
-        }.sortedWith(compareBy<NexTvStation> { station ->
-            val name = station.name.uppercase(java.util.Locale.ROOT)
-            popular.indexOfFirst { name == it || name.startsWith("$it ") || name.startsWith("$it FM") }
-                .let { if (it < 0) Int.MAX_VALUE else it }
-        }.thenBy { it.name })
+        val featuredKeys = featured.map { stationKey(it.name) }.toSet()
+        val seen = mutableSetOf<String>()
+        val sorted = directory.filterNot { stationKey(it.name) in featuredKeys }
+            .sortedWith(compareBy<NexTvStation> { station ->
+                val name = station.name.uppercase(java.util.Locale.ROOT)
+                popular.indexOfFirst { name == it || name.startsWith("$it ") || name.startsWith("$it FM") }
+                    .let { if (it < 0) Int.MAX_VALUE else it }
+            }.thenBy { it.name })
+        return featured + sorted.filter { station -> seen.add(stationKey(station.name)) }
     }
 }
