@@ -60,7 +60,6 @@ class NexRadioActivity : ComponentActivity() {
             var lyricLine by remember { mutableStateOf<String?>(null) }
             var lyricTimeline by remember { mutableStateOf<List<Pair<Long, String>>>(emptyList()) }
             var plainLyrics by remember { mutableStateOf<String?>(null) }
-            var lyricsStartedAt by remember { mutableLongStateOf(0L) }
             var message by remember { mutableStateOf<String?>("Loading Malaysian stations…") }
             var favouriteIds by remember {
                 mutableStateOf((prefs.getStringSet("favourites", null)
@@ -89,7 +88,6 @@ class NexRadioActivity : ComponentActivity() {
                 if (songTitle != nextTitle || songArtist != nextArtist) {
                     songTitle = nextTitle
                     songArtist = nextArtist
-                    lyricsStartedAt = android.os.SystemClock.elapsedRealtime()
                 }
             }
             fun startStream(url: String) {
@@ -225,16 +223,6 @@ class NexRadioActivity : ComponentActivity() {
                     plainLyrics = result.second.takeIf { it.isNotBlank() }
                 }
             }
-            LaunchedEffect(lyricTimeline, plainLyrics, lyricsStartedAt, playing, lyricsEnabled) {
-                while (playing && lyricsEnabled) {
-                    val elapsed = android.os.SystemClock.elapsedRealtime() - lyricsStartedAt
-                    lyricLine = if (lyricTimeline.isNotEmpty()) {
-                        lyricTimeline.lastOrNull { it.first <= elapsed }?.second
-                    } else null
-                    delay(350)
-                }
-            }
-
             // Earlier Glass TV builds stored station names, not stable Radio Browser UUIDs.
             LaunchedEffect(stations) {
                 if (stations.isNotEmpty()) {
