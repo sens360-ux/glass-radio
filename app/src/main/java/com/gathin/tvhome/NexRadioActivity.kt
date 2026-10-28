@@ -354,22 +354,23 @@ class NexRadioActivity : ComponentActivity() {
 
     private fun featuredStations() = listOf(
         NexTvStation("featured-era", "ERA FM",
-            "https://stream.rcs.revma.com/crec9cmbv4uvv",
+            "https://audio1.syok.my/era",
             tagline = "Muzik Hit Terkini", group = "Astro"),
         NexTvStation("featured-ikim", "IKIM FM",
-            "https://ais-sa8.cdnstream1.com/5035/playlist.m3u8",
+            "https://ais-sa8.cdnstream1.com/5035",
             tagline = "Inspirasi Utama Anda", group = "Others"),
     )
 
     /** Direct audio endpoints, not browser player pages. Retry only after an actual player error. */
     private fun streamCandidates(station: NexTvStation): List<String> = when (station.id) {
         "featured-era" -> listOf(
+            "https://audio1.syok.my/era",
             "https://stream.rcs.revma.com/crec9cmbv4uvv",
             "https://stream.rcs.revma.com/crec9cmbv4uvv/14_1mxuqy6p1izr902/playlist.m3u8",
         )
         "featured-ikim" -> listOf(
-            "https://ais-sa8.cdnstream1.com/5035/playlist.m3u8",
             "https://ais-sa8.cdnstream1.com/5035",
+            "https://ais-sa8.cdnstream1.com/5035/playlist.m3u8",
         )
         else -> listOf(station.stream)
     }
