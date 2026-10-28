@@ -14,6 +14,9 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
+import org.json.JSONObject
+import java.net.URLEncoder
 import org.json.JSONArray
 import java.io.File
 import java.net.URL
@@ -49,6 +52,10 @@ class NexRadioActivity : ComponentActivity() {
             var playing by remember { mutableStateOf(false) }
             var songTitle by remember { mutableStateOf<String?>(null) }
             var songArtist by remember { mutableStateOf<String?>(null) }
+            var lyricsEnabled by remember { mutableStateOf(prefs.getBoolean("lyrics_enabled", true)) }
+            var lyricLine by remember { mutableStateOf<String?>(null) }
+            var lyricTimeline by remember { mutableStateOf<List<Pair<Long, String>>>(emptyList()) }
+            var lyricsStartedAt by remember { mutableLongStateOf(0L) }
             var message by remember { mutableStateOf<String?>("Loading Malaysian stations…") }
             var favouriteIds by remember {
                 mutableStateOf((prefs.getStringSet("favourites", null)
@@ -69,6 +76,8 @@ class NexRadioActivity : ComponentActivity() {
                 current = s
                 songTitle = null
                 songArtist = null
+                lyricLine = null
+                lyricTimeline = emptyList()
                 message = "Connecting…"
                 recentIds = (listOf(s.id) + recentIds.filter { it != s.id }).take(12)
                 prefs.edit().putString("recent", recentIds.joinToString("\n")).apply()
@@ -104,6 +113,7 @@ class NexRadioActivity : ComponentActivity() {
                     override fun onMediaMetadataChanged(metadata: MediaMetadata) {
                         songTitle = metadata.title?.toString()?.takeIf { it.isNotBlank() }
                         songArtist = metadata.artist?.toString()?.takeIf { it.isNotBlank() }
+                        lyricsStartedAt = android.os.SystemClock.elapsedRealtime()
                     }
                     override fun onPlayerError(error: PlaybackException) {
                         message = "Station unavailable"
@@ -130,6 +140,44 @@ class NexRadioActivity : ComponentActivity() {
                     if (current == null) message = null
                 } else if (cached.isEmpty()) {
                     message = "Radio directory unavailable. Check internet connection."
+                }
+            }
+
+            // LRC timestamps are estimated from metadata arrival; radio streams do not
+            // provide an exact song-start position. Hide lyrics when metadata is absent.
+            LaunchedEffect(songTitle, songArtist, lyricsEnabled) {
+                lyricTimeline = emptyList()
+                lyricLine = null
+                val title = songTitle?.trim().orEmpty()
+                val artist = songArtist?.trim().orEmpty()
+                if (lyricsEnabled && title.isNotBlank() && artist.isNotBlank()) {
+                    lyricTimeline = withContext(Dispatchers.IO) {
+                        runCatching {
+                            val url = URL("https://lrclib.net/api/get?track_name=" +
+                                URLEncoder.encode(title, "UTF-8") + "&artist_name=" +
+                                URLEncoder.encode(artist, "UTF-8"))
+                            val conn = url.openConnection().apply {
+                                connectTimeout = 5000
+                                readTimeout = 5000
+                                setRequestProperty("User-Agent", "GlassTV/1.0")
+                            }
+                            val raw = JSONObject(conn.getInputStream().bufferedReader().use { it.readText() })
+                                .optString("syncedLyrics")
+                            Regex("""\\[(\\d+):(\\d+(?:\\.\\d+)?)\\](.*)""").findAll(raw).mapNotNull {
+                                val words = it.groupValues[3].trim()
+                                if (words.isEmpty()) null else
+                                    (it.groupValues[1].toLong() * 60000L +
+                                        (it.groupValues[2].toDouble() * 1000).toLong()) to words
+                            }.toList()
+                        }.getOrDefault(emptyList())
+                    }
+                }
+            }
+            LaunchedEffect(lyricTimeline, lyricsStartedAt, playing, lyricsEnabled) {
+                while (playing && lyricsEnabled && lyricTimeline.isNotEmpty()) {
+                    val elapsed = android.os.SystemClock.elapsedRealtime() - lyricsStartedAt
+                    lyricLine = lyricTimeline.lastOrNull { it.first <= elapsed }?.second
+                    delay(250)
                 }
             }
 
@@ -160,6 +208,9 @@ class NexRadioActivity : ComponentActivity() {
                 songTitle = songTitle,
                 songArtist = songArtist,
                 message = message,
+                lyricLine = lyricLine,
+                lyricsEnabled = lyricsEnabled,
+                onToggleLyrics = { lyricsEnabled = !lyricsEnabled; prefs.edit().putBoolean("lyrics_enabled", lyricsEnabled).apply() },
                 favourites = favouriteIds,
                 recent = recentIds,
                 onPlay = ::play,
