@@ -424,8 +424,15 @@ private fun NowPanel(
                         Label(if (message != null) message else "Pick a station", 20.sp, FontWeight.Bold, lines = 2)
                         Label("Choose one on the left and press OK.", 13.sp, color = Dim)
                     }
-                    if (lyricsEnabled && !lyricLine.isNullOrBlank()) Label(lyricLine, 16.sp, FontWeight.Bold, CyanSoft,
-                        modifier = Modifier.padding(top = 8.dp), lines = 2)
+                    if (playing && lyricsEnabled && !lyricLine.isNullOrBlank()) {
+                        Box(Modifier.fillMaxWidth().padding(top = 12.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xDD0B1A33))
+                            .border(1.dp, Cyan.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 12.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
+                            Label(lyricLine, 19.sp, FontWeight.Bold, CyanSoft, lines = 3)
+                        }
+                    }
                     Equaliser(playing, Modifier.fillMaxWidth().height(30.dp).padding(top = 6.dp), Cyan.copy(alpha = 0.8f), 28)
                 }
             }
