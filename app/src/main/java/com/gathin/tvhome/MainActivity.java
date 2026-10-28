@@ -2636,14 +2636,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             showSoundEffectsDialog();
         });
 
-        // Row 7: Auto-Update (OTA)
-        boolean isAuto = AppUpdateManager.isAutoUpdateEnabled(this);
-        String updateLabel = "Auto-Update: " + (isAuto ? "ON (" + AppUpdateManager.getAutoUpdateTime(this) + ")" : "OFF");
-        addInputRow(rows, close, R.drawable.ic_update, updateLabel, -1, () -> {
-            SoundEffects.playSelect();
-            showAutoUpdateDialog();
-        });
-
         // Row 8: Nightstand / Screensaver
         addInputRow(rows, close, R.drawable.ic_weather_sun, "Nightstand Screensaver", -1, () -> {
             SoundEffects.playSelect();
