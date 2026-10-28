@@ -88,6 +88,8 @@ internal fun NexTvRadioScreen(
     onToggleLyrics: () -> Unit,
     favourites: Set<String>,
     recent: List<String>,
+    sourceLabel: String,
+    onHub: () -> Unit,
     onPlay: (NexTvStation) -> Unit,
     onToggle: () -> Unit,
     onNext: () -> Unit,
@@ -173,11 +175,12 @@ internal fun NexTvRadioScreen(
                 }
                 Column(Modifier.padding(start = 8.dp)) {
                     Row { Label("NexTV", 20.sp, FontWeight.ExtraBold); Label(" Radio", 20.sp, FontWeight.SemiBold, Cyan) }
-                    Label("MUSIC • FOR EVERYONE", 7.sp, FontWeight.Medium, Dim)
+                    Label(sourceLabel, 8.sp, FontWeight.Medium, Dim)
                 }
                 Row(Modifier.weight(1f).zone(NexTvRadioFocus.Zone.Menu), horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)) {
                     MenuPill("Home", false, Modifier.focusRequester(menuReq), onHome)
                     MenuPill("Radio", true, Modifier, {})
+                    MenuPill("Hub", false, Modifier, onHub)
                     MenuPill(if (lyricsEnabled) "Lyrics: ON" else "Lyrics: OFF", false,
                         Modifier.focusRequester(lyricsReq), onToggleLyrics)
                 }
@@ -334,22 +337,31 @@ private fun StationTile(
 ) {
     var focused by remember { mutableStateOf(false) }
     var longPressed by remember { mutableStateOf(false) }
+    var holdJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    val holdScope = rememberCoroutineScope()
     val shape = RoundedCornerShape(10.dp)
     Row(
-        modifier.fillMaxWidth().height(46.dp).onFocusChanged { focused = it.isFocused }
+        modifier.fillMaxWidth().height(46.dp).onFocusChanged { focused = it.isFocused; if (!it.isFocused) { holdJob?.cancel(); holdJob = null; longPressed = false } }
             .onPreviewKeyEvent { event ->
                 when {
                     event.type == KeyEventType.KeyDown && event.key == Key.Menu -> { onFavourite(); true }
                     event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter -> {
                         when (event.type) {
                             KeyEventType.KeyDown -> {
-                                if (event.nativeKeyEvent.repeatCount > 0 && !longPressed) {
-                                    longPressed = true
-                                    onFavourite()
-                                    true
-                                } else longPressed
+                                if (event.nativeKeyEvent.repeatCount == 0) {
+                                    holdJob?.cancel()
+                                    longPressed = false
+                                    holdJob = holdScope.launch {
+                                        delay(650)
+                                        longPressed = true
+                                        onFavourite()
+                                    }
+                                }
+                                false
                             }
                             KeyEventType.KeyUp -> {
+                                holdJob?.cancel()
+                                holdJob = null
                                 val consumed = longPressed
                                 longPressed = false
                                 consumed
