@@ -185,9 +185,22 @@ class NexRadioActivity : ComponentActivity() {
                 val url = URL("https://$host/json/stations/bycountrycodeexact/MY?hidebroken=true&order=votes&reverse=true&limit=300")
                 val connection = url.openConnection().apply { connectTimeout = 8_000; readTimeout = 12_000 }
                 val json = connection.getInputStream().bufferedReader().use { it.readText() }
-                val list = parseDirectory(json)
+                val combined = JSONArray(json)
+                // Fetch popular stations by name too: the country top-300 list can omit ERA/IKIM.
+                for (term in listOf("ERA", "IKIM")) {
+                    try {
+                        val searchUrl = URL("https://$host/json/stations/byname/${java.net.URLEncoder.encode(term, "UTF-8")}?hidebroken=true&limit=50")
+                        val searchConnection = searchUrl.openConnection().apply { connectTimeout = 5_000; readTimeout = 7_000 }
+                        val matches = JSONArray(searchConnection.getInputStream().bufferedReader().use { it.readText() })
+                        for (i in 0 until matches.length()) {
+                            val station = matches.getJSONObject(i)
+                            if (station.optString("countrycode").equals("MY", true)) combined.put(station)
+                        }
+                    } catch (_: Exception) { /* Keep the main directory if a name lookup fails. */ }
+                }
+                val list = parseDirectory(combined.toString())
                 if (list.isNotEmpty()) {
-                    runCatching { cacheFile.writeText(json) }
+                    runCatching { cacheFile.writeText(combined.toString()) }
                     return list
                 }
             } catch (_: Exception) {
