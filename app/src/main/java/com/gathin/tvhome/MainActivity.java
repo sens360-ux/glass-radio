@@ -2674,6 +2674,19 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         LinearLayout rows = panel.findViewById(R.id.rows);
         Runnable close = () -> closeMenu(false);
 
+        // Auto-run is opt-out. On Google TV the system may still require Glass TV as default Home.
+        boolean bootEnabled = getSharedPreferences(BootLaunchReceiver.PREFS, MODE_PRIVATE)
+                .getBoolean(BootLaunchReceiver.KEY_AUTORUN, true);
+        addInputRow(rows, close, R.drawable.ic_restart,
+                "Auto Run During Boot: " + (bootEnabled ? "ON" : "OFF"), -1, () -> {
+                    getSharedPreferences(BootLaunchReceiver.PREFS, MODE_PRIVATE).edit()
+                            .putBoolean(BootLaunchReceiver.KEY_AUTORUN, !bootEnabled).apply();
+                    Toast.makeText(this, "Auto Run " + (!bootEnabled ? "ON" : "OFF")
+                            + ". Set Glass TV as Default Home for reliable launch.", Toast.LENGTH_LONG).show();
+                    closeMenu(false);
+                });
+        addSeparator(rows);
+
         // Row 1: Restart TV
         addInputRow(rows, close, R.drawable.ic_restart, "Restart TV", -1, () -> {
             SoundEffects.playSelect();
