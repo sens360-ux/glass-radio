@@ -355,34 +355,52 @@ private fun StationTile(
 ) {
     var focused by remember { mutableStateOf(false) }
     var longPressed by remember { mutableStateOf(false) }
+    var pressArmed by remember { mutableStateOf(false) }
     var holdJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     val holdScope = rememberCoroutineScope()
     val shape = RoundedCornerShape(10.dp)
     Row(
-        modifier.fillMaxWidth().height(46.dp).onFocusChanged { focused = it.isFocused; if (!it.isFocused) { holdJob?.cancel(); holdJob = null; longPressed = false } }
+        modifier.fillMaxWidth().height(46.dp).onFocusChanged {
+                focused = it.isFocused
+                if (!it.isFocused) {
+                    holdJob?.cancel()
+                    holdJob = null
+                    longPressed = false
+                    pressArmed = false
+                }
+            }
             .onPreviewKeyEvent { event ->
                 when {
-                    event.type == KeyEventType.KeyDown && event.key == Key.Menu -> { onFavourite(); true }
+                    event.type == KeyEventType.KeyDown && event.key == Key.Menu -> {
+                        onFavourite()
+                        true
+                    }
                     event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter -> {
                         when (event.type) {
                             KeyEventType.KeyDown -> {
-                                if (event.nativeKeyEvent.repeatCount == 0) {
+                                if (event.nativeKeyEvent.repeatCount == 0 && !pressArmed) {
                                     holdJob?.cancel()
+                                    pressArmed = true
                                     longPressed = false
                                     holdJob = holdScope.launch {
                                         delay(650)
-                                        longPressed = true
-                                        onFavourite()
+                                        if (pressArmed) {
+                                            longPressed = true
+                                            onFavourite()
+                                        }
                                     }
                                 }
-                                false
+                                // Consume both edges: clickable must not play after a long hold.
+                                true
                             }
                             KeyEventType.KeyUp -> {
                                 holdJob?.cancel()
                                 holdJob = null
-                                val consumed = longPressed
+                                val shortPress = pressArmed && !longPressed
+                                pressArmed = false
                                 longPressed = false
-                                consumed
+                                if (shortPress) onPlay()
+                                true
                             }
                             else -> false
                         }
