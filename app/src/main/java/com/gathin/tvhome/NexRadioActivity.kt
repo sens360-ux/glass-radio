@@ -51,6 +51,8 @@ class NexRadioActivity : ComponentActivity() {
 
         setContent {
             var stations by remember { mutableStateOf<List<NexTvStation>>(featuredStations()) }
+            var directoryStations by remember { mutableStateOf<List<NexTvStation>>(emptyList()) }
+            var activeStreamUrls by remember { mutableStateOf<List<String>>(emptyList()) }
             var current by remember { mutableStateOf<NexTvStation?>(null) }
             var playing by remember { mutableStateOf(false) }
             var streamAttempt by remember { mutableIntStateOf(0) }
@@ -109,7 +111,23 @@ class NexRadioActivity : ComponentActivity() {
                 message = "Connecting…"
                 recentIds = (listOf(s.id) + recentIds.filter { it != s.id }).take(12)
                 prefs.edit().putString("recent", recentIds.joinToString("\n")).apply()
-                startStream(streamCandidates(s).first())
+                // Use independently listed IKIM streams before older fixed endpoints.
+                // Keep directory entries hidden as duplicates in the station list.
+                val discovered = if (s.id == "featured-ikim")
+                    directoryStations.filter { stationKey(it.name) == "IKIM" }.map { it.stream }
+                else emptyList()
+                activeStreamUrls = (discovered + streamCandidates(s)).distinct()
+                startStream(activeStreamUrls.first())
+            }
+            fun tryNextStream(reason: String) {
+                if (streamAttempt + 1 < activeStreamUrls.size) {
+                    streamAttempt++
+                    message = "Trying alternate stream…"
+                    startStream(activeStreamUrls[streamAttempt])
+                } else {
+                    message = reason
+                    playing = false
+                }
             }
             fun step(delta: Int) {
                 if (stations.isEmpty()) return
@@ -149,19 +167,21 @@ class NexRadioActivity : ComponentActivity() {
                         }
                     }
                     override fun onPlayerError(error: PlaybackException) {
-                        val options = current?.let(::streamCandidates).orEmpty()
-                        if (streamAttempt + 1 < options.size) {
-                            streamAttempt++
-                            message = "Trying alternate stream…"
-                            startStream(options[streamAttempt])
-                        } else {
-                            message = "Station unavailable (" + error.errorCodeName + ")"
-                            playing = false
-                        }
+                        tryNextStream("Station unavailable (" + error.errorCodeName + ")")
                     }
                 }
                 engine?.addListener(listener)
                 onDispose { engine?.removeListener(listener) }
+            }
+
+            // A stream can hang in BUFFERING without reporting an error on some TVs.
+            LaunchedEffect(current?.id, streamAttempt) {
+                if (current != null) {
+                    delay(16_000)
+                    if (engine?.playWhenReady == true && engine?.playbackState == Player.STATE_BUFFERING) {
+                        tryNextStream("Station timed out")
+                    }
+                }
             }
 
             LaunchedEffect(Unit) {
@@ -169,6 +189,7 @@ class NexRadioActivity : ComponentActivity() {
                     runCatching { parseDirectory(File(cacheDir, "nexradio-directory.json").readText()) }.getOrDefault(emptyList())
                 }
                 if (cached.isNotEmpty()) {
+                    directoryStations = cached
                     stations = mergeFeatured(cached)
                     message = null
                 }
@@ -176,6 +197,7 @@ class NexRadioActivity : ComponentActivity() {
                     fetchDirectory(File(cacheDir, "nexradio-directory.json"))
                 }
                 if (fresh.isNotEmpty()) {
+                    directoryStations = fresh
                     stations = mergeFeatured(fresh)
                     if (current == null) message = null
                 } else if (cached.isEmpty()) {
@@ -307,7 +329,7 @@ class NexRadioActivity : ComponentActivity() {
 
     private fun parseDirectory(json: String): List<NexTvStation> {
         val rows = JSONArray(json)
-        return mergeFeatured((0 until rows.length()).mapNotNull { index ->
+        return (0 until rows.length()).mapNotNull { index ->
             val row = rows.getJSONObject(index)
             val name = row.optString("name").trim()
             // Exclude Chinese-language stations from the Malaysian radio directory.
@@ -348,7 +370,7 @@ class NexRadioActivity : ComponentActivity() {
                 group = group,
                 bitrate = row.optInt("bitrate").takeIf { it > 0 },
             )
-        }.distinctBy { it.id })
+        }.distinctBy { it.id }
     }
 
     private fun featuredStations() = listOf(
