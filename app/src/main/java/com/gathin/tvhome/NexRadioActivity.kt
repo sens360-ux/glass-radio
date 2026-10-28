@@ -82,7 +82,11 @@ class NexRadioActivity : ComponentActivity() {
 
             fun toggleFavourite(s: NexTvStation) {
                 favouriteIds = if (s.id in favouriteIds) favouriteIds - s.id else favouriteIds + s.id
-                prefs.edit().putStringSet("favourites", favouriteIds).apply()
+                val names = (prefs.getStringSet("favourite_station_names", emptySet()) ?: emptySet()).toMutableSet()
+                if (s.id in favouriteIds) names.add(stationKey(s.name))
+                else names.remove(stationKey(s.name))
+                prefs.edit().putStringSet("favourites", favouriteIds)
+                    .putStringSet("favourite_station_names", names).apply()
             }
             fun play(s: NexTvStation) {
                 current = s
@@ -92,7 +96,11 @@ class NexRadioActivity : ComponentActivity() {
                 lyricTimeline = emptyList()
                 message = "Connecting…"
                 recentIds = (listOf(s.id) + recentIds.filter { it != s.id }).take(12)
-                prefs.edit().putString("recent", recentIds.joinToString("\n")).apply()
+                val previousNames = (prefs.getString("recent_names", "") ?: "").split("\n")
+                val recentNames = (listOf(stationKey(s.name)) + previousNames)
+                    .filter { it.isNotBlank() }.distinct().take(12)
+                prefs.edit().putString("recent", recentIds.joinToString("\n"))
+                    .putString("recent_names", recentNames.joinToString("\n")).apply()
                 engine?.apply {
                     stop()
                     setMediaItem(MediaItem.fromUri(s.stream))
@@ -248,12 +256,20 @@ class NexRadioActivity : ComponentActivity() {
             // Earlier Glass TV builds stored station names, not stable Radio Browser UUIDs.
             LaunchedEffect(stations) {
                 if (stations.isNotEmpty()) {
-                    val migratedFavourites = favouriteIds.map { key ->
+                    val names = prefs.getStringSet("favourite_station_names", emptySet()) ?: emptySet()
+                    val migratedFavourites = (
+                        favouriteIds.map { key ->
+                            stations.firstOrNull { it.id == key || it.name == key }?.id ?: key
+                        } + stations.filter { stationKey(it.name) in names }.map { it.id }
+                    ).toSet()
+                    val recentNames = (prefs.getString("recent_names", "") ?: "")
+                        .split("\n").filter { it.isNotBlank() }
+                    val mappedRecent = recentNames.mapNotNull { key ->
+                        stations.firstOrNull { stationKey(it.name) == key }?.id
+                    }
+                    val migratedRecent = (mappedRecent + recentIds.map { key ->
                         stations.firstOrNull { it.id == key || it.name == key }?.id ?: key
-                    }.toSet()
-                    val migratedRecent = recentIds.map { key ->
-                        stations.firstOrNull { it.id == key || it.name == key }?.id ?: key
-                    }.distinct()
+                    }).distinct().take(12)
                     if (migratedFavourites != favouriteIds) {
                         favouriteIds = migratedFavourites
                         prefs.edit().putStringSet("favourites", favouriteIds).apply()
