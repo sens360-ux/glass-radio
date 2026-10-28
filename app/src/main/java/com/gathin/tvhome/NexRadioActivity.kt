@@ -10,6 +10,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.*
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -287,11 +290,11 @@ class NexRadioActivity : ComponentActivity() {
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Pair Glass TV with NexTV Hub")
+                    Text("Pair Glass TV with NexTV Hub", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(20.dp))
-                    Text(pairingCode ?: "Waiting for pairing code…")
+                    Text(pairingCode ?: "Waiting for pairing code…", color = Color.White, fontSize = 24.sp)
                     Spacer(Modifier.height(12.dp))
-                    Text(pairingMessage)
+                    Text(pairingMessage, color = Color.White, fontSize = 18.sp)
                     Spacer(Modifier.height(24.dp))
                     Button(onClick = { pairingCode = null; pairingMessage = "Retrying…"; pairingAttempt++ }) { Text("Retry pairing") }
                     Spacer(Modifier.height(12.dp))
