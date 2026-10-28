@@ -59,6 +59,7 @@ class NexRadioActivity : ComponentActivity() {
             var lyricsEnabled by remember { mutableStateOf(prefs.getBoolean("lyrics_enabled", true)) }
             var lyricLine by remember { mutableStateOf<String?>(null) }
             var lyricTimeline by remember { mutableStateOf<List<Pair<Long, String>>>(emptyList()) }
+            var plainLyrics by remember { mutableStateOf<String?>(null) }
             var lyricsStartedAt by remember { mutableLongStateOf(0L) }
             var message by remember { mutableStateOf<String?>("Loading Malaysian stations…") }
             var favouriteIds by remember {
@@ -106,6 +107,7 @@ class NexRadioActivity : ComponentActivity() {
                 songArtist = null
                 lyricLine = null
                 lyricTimeline = emptyList()
+                plainLyrics = null
                 message = "Connecting…"
                 recentIds = (listOf(s.id) + recentIds.filter { it != s.id }).take(12)
                 prefs.edit().putString("recent", recentIds.joinToString("\n")).apply()
@@ -185,43 +187,51 @@ class NexRadioActivity : ComponentActivity() {
 
             // LRC timestamps are estimated from metadata arrival; radio streams do not
             // provide an exact song-start position. Hide lyrics when metadata is absent.
+            // Radio metadata is not always timed; use synced LRC when available and
+            // fall back to the first lines of plain lyrics for automatic display.
             LaunchedEffect(songTitle, songArtist, lyricsEnabled) {
                 lyricTimeline = emptyList()
                 lyricLine = null
+                plainLyrics = null
                 val title = songTitle?.trim().orEmpty()
                 val artist = songArtist?.trim().orEmpty()
-                if (lyricsEnabled && title.isNotBlank() && artist.isNotBlank()) {
-                    lyricTimeline = withContext(Dispatchers.IO) {
-                        val params = "track_name=" + URLEncoder.encode(title, "UTF-8") +
-                            "&artist_name=" + URLEncoder.encode(artist, "UTF-8")
-                        fun fetchJson(endpoint: String): String {
-                            val conn = URL("https://lrclib.net/api/" + endpoint).openConnection().apply {
-                                connectTimeout = 5_000
-                                readTimeout = 5_000
-                                setRequestProperty("User-Agent", "GlassTV/1.0")
+                if (lyricsEnabled && title.isNotBlank()) {
+                    val result = withContext(Dispatchers.IO) {
+                        runCatching {
+                            fun fetch(url: String): JSONObject {
+                                val conn = URL(url).openConnection().apply {
+                                    connectTimeout = 6000
+                                    readTimeout = 6000
+                                    setRequestProperty("User-Agent", "GlassTV/1.0")
+                                }
+                                return JSONObject(conn.getInputStream().bufferedReader().use { it.readText() })
                             }
-                            return conn.getInputStream().bufferedReader().use { it.readText() }
-                        }
-                        // Exact match often returns 404 for radio metadata with slight spelling
-                        // differences. Search LRCLIB before declaring synchronized lyrics absent.
-                        val exact = runCatching {
-                            NexTvLyrics.parseSyncedLrc(JSONObject(fetchJson("get?" + params)).optString("syncedLyrics"))
-                        }.getOrDefault(emptyList())
-                        if (exact.isNotEmpty()) exact else runCatching {
-                            val matches = JSONArray(fetchJson("search?" + params))
-                            (0 until matches.length()).asSequence().mapNotNull { index ->
-                                NexTvLyrics.parseSyncedLrc(matches.getJSONObject(index).optString("syncedLyrics"))
-                                    .takeIf { it.isNotEmpty() }
-                            }.firstOrNull().orEmpty()
-                        }.getOrDefault(emptyList())
+                            val query = "track_name=" + URLEncoder.encode(title, "UTF-8") +
+                                "&artist_name=" + URLEncoder.encode(artist, "UTF-8")
+                            val exact = runCatching { fetch("https://lrclib.net/api/get?" + query) }.getOrNull()
+                            val match = exact ?: run {
+                                val conn = URL("https://lrclib.net/api/search?" + query).openConnection().apply {
+                                    connectTimeout = 6000; readTimeout = 6000
+                                    setRequestProperty("User-Agent", "GlassTV/1.0")
+                                }
+                                JSONArray(conn.getInputStream().bufferedReader().use { it.readText() }).optJSONObject(0)
+                            }
+                            val synced = match?.optString("syncedLyrics").orEmpty()
+                            val plain = match?.optString("plainLyrics").orEmpty()
+                            NexTvLyrics.parseSyncedLrc(synced) to plain
+                        }.getOrDefault(emptyList<Pair<Long, String>>() to "")
                     }
+                    lyricTimeline = result.first
+                    plainLyrics = result.second.takeIf { it.isNotBlank() }
                 }
             }
-            LaunchedEffect(lyricTimeline, lyricsStartedAt, playing, lyricsEnabled) {
-                while (playing && lyricsEnabled && lyricTimeline.isNotEmpty()) {
+            LaunchedEffect(lyricTimeline, plainLyrics, lyricsStartedAt, playing, lyricsEnabled) {
+                while (playing && lyricsEnabled) {
                     val elapsed = android.os.SystemClock.elapsedRealtime() - lyricsStartedAt
-                    lyricLine = lyricTimeline.lastOrNull { it.first <= elapsed }?.second
-                    delay(250)
+                    lyricLine = if (lyricTimeline.isNotEmpty()) {
+                        lyricTimeline.lastOrNull { it.first <= elapsed }?.second
+                    } else plainLyrics?.lineSequence()?.filter { it.isNotBlank() }?.take(2)?.joinToString(" ")
+                    delay(350)
                 }
             }
 
