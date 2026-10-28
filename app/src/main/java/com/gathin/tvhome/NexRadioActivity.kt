@@ -230,7 +230,7 @@ class NexRadioActivity : ComponentActivity() {
                     val elapsed = android.os.SystemClock.elapsedRealtime() - lyricsStartedAt
                     lyricLine = if (lyricTimeline.isNotEmpty()) {
                         lyricTimeline.lastOrNull { it.first <= elapsed }?.second
-                    } else plainLyrics?.lineSequence()?.filter { it.isNotBlank() }?.take(2)?.joinToString(" ")
+                    } else null
                     delay(350)
                 }
             }
@@ -263,6 +263,7 @@ class NexRadioActivity : ComponentActivity() {
                 songArtist = songArtist,
                 message = message,
                 lyricLine = lyricLine,
+                fullLyrics = plainLyrics ?: lyricTimeline.joinToString("\n") { it.second },
                 lyricsEnabled = lyricsEnabled,
                 onToggleLyrics = { lyricsEnabled = !lyricsEnabled; prefs.edit().putBoolean("lyrics_enabled", lyricsEnabled).apply() },
                 favourites = favouriteIds,
