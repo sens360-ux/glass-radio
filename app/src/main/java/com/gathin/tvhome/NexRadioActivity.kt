@@ -218,6 +218,8 @@ class NexRadioActivity : ComponentActivity() {
                 onToggleLyrics = { lyricsEnabled = !lyricsEnabled; prefs.edit().putBoolean("lyrics_enabled", lyricsEnabled).apply() },
                 favourites = favouriteIds,
                 recent = recentIds,
+                sourceLabel = "Public Radio",
+                onHub = {},
                 onPlay = ::play,
                 onToggle = ::toggle,
                 onNext = { step(1) },
