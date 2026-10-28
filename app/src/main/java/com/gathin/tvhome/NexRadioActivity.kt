@@ -192,18 +192,27 @@ class NexRadioActivity : ComponentActivity() {
                 val artist = songArtist?.trim().orEmpty()
                 if (lyricsEnabled && title.isNotBlank() && artist.isNotBlank()) {
                     lyricTimeline = withContext(Dispatchers.IO) {
-                        runCatching {
-                            val url = URL("https://lrclib.net/api/get?track_name=" +
-                                URLEncoder.encode(title, "UTF-8") + "&artist_name=" +
-                                URLEncoder.encode(artist, "UTF-8"))
-                            val conn = url.openConnection().apply {
-                                connectTimeout = 5000
-                                readTimeout = 5000
+                        val params = "track_name=" + URLEncoder.encode(title, "UTF-8") +
+                            "&artist_name=" + URLEncoder.encode(artist, "UTF-8")
+                        fun fetchJson(endpoint: String): String {
+                            val conn = URL("https://lrclib.net/api/" + endpoint).openConnection().apply {
+                                connectTimeout = 5_000
+                                readTimeout = 5_000
                                 setRequestProperty("User-Agent", "GlassTV/1.0")
                             }
-                            val raw = JSONObject(conn.getInputStream().bufferedReader().use { it.readText() })
-                                .optString("syncedLyrics")
-                            NexTvLyrics.parseSyncedLrc(raw)
+                            return conn.getInputStream().bufferedReader().use { it.readText() }
+                        }
+                        // Exact match often returns 404 for radio metadata with slight spelling
+                        // differences. Search LRCLIB before declaring synchronized lyrics absent.
+                        val exact = runCatching {
+                            NexTvLyrics.parseSyncedLrc(JSONObject(fetchJson("get?" + params)).optString("syncedLyrics"))
+                        }.getOrDefault(emptyList())
+                        if (exact.isNotEmpty()) exact else runCatching {
+                            val matches = JSONArray(fetchJson("search?" + params))
+                            (0 until matches.length()).asSequence().mapNotNull { index ->
+                                NexTvLyrics.parseSyncedLrc(matches.getJSONObject(index).optString("syncedLyrics"))
+                                    .takeIf { it.isNotEmpty() }
+                            }.firstOrNull().orEmpty()
                         }.getOrDefault(emptyList())
                     }
                 }
