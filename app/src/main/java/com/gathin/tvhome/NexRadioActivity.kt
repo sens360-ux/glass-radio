@@ -56,6 +56,7 @@ class NexRadioActivity : ComponentActivity() {
         setContent {
             var paired by remember { mutableStateOf(hub.token() != null) }
             var pairingAttempt by remember { mutableIntStateOf(0) }
+            var usePublic by remember { mutableStateOf(hub.token() == null) }
             var pairingCode by remember { mutableStateOf<String?>(null) }
             var pairingMessage by remember { mutableStateOf("Connecting to NexTV Hub…") }
             var stations by remember { mutableStateOf<List<NexTvStation>>(emptyList()) }
@@ -145,13 +146,14 @@ class NexRadioActivity : ComponentActivity() {
                 onDispose { engine?.removeListener(listener) }
             }
 
-            LaunchedEffect(paired, pairingAttempt) {
-                if (!paired) {
+            LaunchedEffect(paired, pairingAttempt, usePublic) {
+                if (!paired && !usePublic) {
                     pairingCode = null
                     pairingMessage = "Requesting NexTV Hub pairing code…"
                     val result = withContext(Dispatchers.IO) { runCatching { hub.requestPairing() } }
                     if (result.isFailure) {
                         pairingMessage = "Hub connection failed: " + (result.exceptionOrNull()?.message ?: "Unknown error")
+                        usePublic = true
                     } else {
                         val (code, expiry) = result.getOrThrow()
                         pairingCode = code
@@ -168,9 +170,9 @@ class NexRadioActivity : ComponentActivity() {
                                 } else pairingMessage = "Cannot save pairing securely. Select Retry."
                                 break
                             }
-                            if (poll.isFailure) { pairingMessage = "Pairing check failed: " + (poll.exceptionOrNull()?.message ?: "Unknown error"); break }
+                            if (poll.isFailure) { pairingMessage = "Pairing check failed: " + (poll.exceptionOrNull()?.message ?: "Unknown error"); usePublic = true; break }
                         }
-                        if (!paired && pairingMessage.startsWith("Open ")) pairingMessage = "Pairing expired. Select Retry."
+                        if (!paired && pairingMessage.startsWith("Open ")) { pairingMessage = "Pairing expired."; usePublic = true }
                     }
                 } else {
                     message = "Loading stations from NexTV Hub…"
@@ -178,9 +180,33 @@ class NexRadioActivity : ComponentActivity() {
                     if (result.isSuccess) {
                         stations = mergeFeatured(result.getOrThrow())
                         message = if (stations.isEmpty()) "Hub returned no playable stations" else null
+                        if (stations.isEmpty()) usePublic = true
                     } else {
                         message = result.exceptionOrNull()?.message ?: "Hub radio unavailable"
                         if (hub.token() == null) paired = false
+                        usePublic = true
+                    }
+                }
+            }
+
+            LaunchedEffect(usePublic) {
+                if (usePublic) {
+                    val cache = File(cacheDir, "glass_radio_my_directory.json")
+                    val cached = withContext(Dispatchers.IO) {
+                        runCatching { parseDirectory(cache.readText()) }.getOrDefault(emptyList())
+                    }
+                    if (cached.isNotEmpty()) {
+                        stations = cached
+                        message = null
+                    }
+                    val fresh = withContext(Dispatchers.IO) {
+                        runCatching { fetchDirectory(cache) }.getOrDefault(emptyList())
+                    }
+                    if (fresh.isNotEmpty()) {
+                        stations = fresh
+                        message = null
+                    } else if (stations.isEmpty()) {
+                        message = "Cannot load radio directory. Check Internet."
                     }
                 }
             }
@@ -238,7 +264,7 @@ class NexRadioActivity : ComponentActivity() {
                 }
             }
 
-            if (!paired) {
+            if (!paired && !usePublic) {
                 androidx.compose.foundation.layout.Column(
                     modifier = Modifier.fillMaxSize().padding(48.dp),
                     verticalArrangement = Arrangement.Center,
@@ -251,6 +277,8 @@ class NexRadioActivity : ComponentActivity() {
                     Text(pairingMessage)
                     Spacer(Modifier.height(24.dp))
                     Button(onClick = { pairingCode = null; pairingMessage = "Retrying…"; pairingAttempt++ }) { Text("Retry pairing") }
+                    Spacer(Modifier.height(12.dp))
+                    Button(onClick = { usePublic = true }) { Text("Listen without Hub") }
                     Spacer(Modifier.height(12.dp))
                     Button(onClick = { finish() }) { Text("Back") }
                 }
@@ -267,6 +295,8 @@ class NexRadioActivity : ComponentActivity() {
                 onToggleLyrics = { lyricsEnabled = !lyricsEnabled; prefs.edit().putBoolean("lyrics_enabled", lyricsEnabled).apply() },
                 favourites = favouriteIds,
                 recent = recentIds,
+                sourceLabel = if (usePublic) "Public radio directory" else "NexTV Hub",
+                onHub = { usePublic = false; paired = false; pairingAttempt++ },
                 onPlay = ::play,
                 onToggle = ::toggle,
                 onNext = { step(1) },
