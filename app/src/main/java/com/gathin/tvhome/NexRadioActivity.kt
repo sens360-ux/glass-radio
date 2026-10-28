@@ -215,6 +215,27 @@ class NexRadioActivity : ComponentActivity() {
         return (0 until rows.length()).mapNotNull { index ->
             val row = rows.getJSONObject(index)
             val name = row.optString("name").trim()
+            // Exclude Chinese-language stations from the Malaysian radio directory.
+            // Radio Browser language metadata is not always populated, so check common
+            // Chinese-language station names as a fallback.
+            val languages = row.optString("language").lowercase(java.util.Locale.ROOT)
+            val languageCodes = row.optString("languagecodes").lowercase(java.util.Locale.ROOT)
+            val chineseLanguage = languages.split(',', ';').any {
+                val value = it.trim()
+                value == "chinese" || value == "mandarin" || value == "cantonese" ||
+                    value == "hakka" || value == "hokkien" || value == "min nan" ||
+                    value == "yue" || value == "zh"
+            } || languageCodes.split(',', ';').any {
+                val code = it.trim()
+                code == "zh" || code.startsWith("zh-") || code == "yue" || code == "nan" || code == "hak"
+            }
+            val chineseStationName = listOf("988", "MY FM", "MYFM", "ONE FM", "ONEFM",
+                "EIGHT FM", "8FM", "MELODY FM", "MELODY", "GOXUAN", "CITYPLUS",
+                "AI FM", "AIFM", "TEA FM", "TEAFM").any { keyword ->
+                name.equals(keyword, true) || name.startsWith("$keyword ", true) ||
+                    name.startsWith("$keyword-", true)
+            }
+            if (chineseLanguage || chineseStationName) return@mapNotNull null
             val stream = row.optString("url_resolved").ifBlank { row.optString("url") }.trim()
             if (name.isBlank() || !stream.startsWith("http", ignoreCase = true)) return@mapNotNull null
             val group = when {
