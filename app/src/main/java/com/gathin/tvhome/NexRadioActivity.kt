@@ -151,7 +151,7 @@ class NexRadioActivity : ComponentActivity() {
                     pairingMessage = "Requesting NexTV Hub pairing code…"
                     val result = withContext(Dispatchers.IO) { runCatching { hub.requestPairing() } }
                     if (result.isFailure) {
-                        pairingMessage = "Cannot reach NexTV Hub. Select Retry."
+                        pairingMessage = "Hub connection failed: " + (result.exceptionOrNull()?.message ?: "Unknown error")
                     } else {
                         val (code, expiry) = result.getOrThrow()
                         pairingCode = code
@@ -168,7 +168,7 @@ class NexRadioActivity : ComponentActivity() {
                                 } else pairingMessage = "Cannot save pairing securely. Select Retry."
                                 break
                             }
-                            if (poll.isFailure) { pairingMessage = "Pairing check failed. Select Retry."; break }
+                            if (poll.isFailure) { pairingMessage = "Pairing check failed: " + (poll.exceptionOrNull()?.message ?: "Unknown error"); break }
                         }
                         if (!paired && pairingMessage.startsWith("Open ")) pairingMessage = "Pairing expired. Select Retry."
                     }
