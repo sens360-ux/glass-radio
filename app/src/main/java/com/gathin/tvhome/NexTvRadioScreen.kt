@@ -4,6 +4,7 @@ package com.gathin.tvhome
 // RadioUi.kt and RadioFocus.kt (MIT, copyright 2026 Nexdata).
 // Non-radio cards and NexTV Hub authentication have intentionally been removed.
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -112,6 +113,7 @@ internal fun NexTvRadioScreen(
     var focusedStation by remember { mutableStateOf<String?>(null) }
     var focusedControl by remember { mutableIntStateOf(1) }
     val favStations = remember(stations, favourites) { stations.filter { it.id in favourites } }
+    val orderedStations = remember(stations, favourites) { stations.sortedWith(compareByDescending<NexTvStation> { it.id in favourites }) }
     val recentStations = remember(stations, recent) { recent.mapNotNull { id -> stations.firstOrNull { it.id == id } }.take(3) }
     var clock by remember { mutableStateOf(ZonedDateTime.now(KL)) }
     LaunchedEffect(Unit) { while (true) { delay(30_000); clock = ZonedDateTime.now(KL) } }
@@ -119,7 +121,7 @@ internal fun NexTvRadioScreen(
     LaunchedEffect(stations.isNotEmpty()) {
         withFrameNanos { }
         if (stations.isNotEmpty() && !initialStationFocus) {
-            runCatching { rowReq(stations.first().id).requestFocus() }.onSuccess { initialStationFocus = true }
+            runCatching { rowReq(orderedStations.first().id).requestFocus() }.onSuccess { initialStationFocus = true }
         } else if (stations.isEmpty() && !initialStationFocus) {
             runCatching { menuReq.requestFocus() }
         }
@@ -131,8 +133,8 @@ internal fun NexTvRadioScreen(
             NexTvRadioFocus.Zone.Favourites -> favReq.requestFocus()
             NexTvRadioFocus.Zone.Recent -> recentReq.requestFocus()
             NexTvRadioFocus.Zone.Stations -> {
-                val id = (current?.id ?: focusedStation)?.takeIf { key -> stations.any { it.id == key } } ?: stations.first().id
-                val index = stations.indexOfFirst { it.id == id }
+                val id = (current?.id ?: focusedStation)?.takeIf { key -> orderedStations.any { it.id == key } } ?: orderedStations.first().id
+                val index = orderedStations.indexOfFirst { it.id == id }
                 if (listState.layoutInfo.visibleItemsInfo.any { it.index == index }) rowReq(id).requestFocus()
                 else scope.launch {
                     listState.scrollToItem(index)
@@ -168,7 +170,7 @@ internal fun NexTvRadioScreen(
         }
         val to = NexTvRadioFocus.next(
             zone, dir, stations.isNotEmpty(), favStations.isNotEmpty(),
-            NexTvRadioFocus.onFirstStation(stations.map { it.id }, focusedStation), focusedControl,
+            NexTvRadioFocus.onFirstStation(orderedStations.map { it.id }, focusedStation), focusedControl,
             hasRecent = recentStations.isNotEmpty(),
         ) ?: return@onPreviewKeyEvent false
         to == zone || go(to)
@@ -213,12 +215,13 @@ internal fun NexTvRadioScreen(
                 Glass(Modifier.width(190.dp).fillMaxHeight().zone(NexTvRadioFocus.Zone.Stations)) {
                     Column {
                         Label("Radio Stations", 15.sp, FontWeight.SemiBold)
+                        Label("♥ Favourites first  ·  Hold OK to save", 9.sp, color = Dim)
                         Spacer(Modifier.height(6.dp))
                         if (stations.isEmpty()) {
                             Label(message ?: "Radio: no stations yet", 11.sp, color = Dim, lines = 3)
                         } else {
                             LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                itemsIndexed(stations, key = { _, s -> s.id }) { _, station ->
+                                itemsIndexed(orderedStations, key = { _, s -> s.id }) { _, station ->
                                     StationTile(
                                         station, current?.id == station.id && playing,
                                         station.id in favourites,
@@ -239,6 +242,24 @@ internal fun NexTvRadioScreen(
                     playReq, onToggle, onNext, onPrevious,
                 ) { focusedControl = it }
                 Column(Modifier.width(190.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Glass(Modifier.fillMaxWidth().weight(1f).zone(NexTvRadioFocus.Zone.Favourites)) {
+                        Column {
+                            Label("♥  Favourite Stations", 13.sp, FontWeight.SemiBold, Color(0xFFFF6B8A))
+                            if (favStations.isEmpty()) {
+                                Label("Hold OK on a station to add it", 9.sp, color = Dim, modifier = Modifier.padding(top = 5.dp), lines = 2)
+                            } else Row(Modifier.padding(top = 7.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                favStations.take(4).forEachIndexed { index, station ->
+                                    var focused by remember { mutableStateOf(false) }
+                                    Box(
+                                        (if (index == 0) Modifier.focusRequester(favReq) else Modifier)
+                                            .onFocusChanged { focused = it.isFocused }
+                                            .border(if (focused) 2.dp else 0.dp, if (focused) Cyan else Color.Transparent, RoundedCornerShape(8.dp))
+                                            .clickable { onPlay(station) },
+                                    ) { StationLogo(station, 36.dp) }
+                                }
+                            }
+                        }
+                    }
                     Glass(Modifier.fillMaxWidth().weight(1f).zone(NexTvRadioFocus.Zone.Recent)) {
                         Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
                             Label("◷  Recently Played", 13.sp, FontWeight.SemiBold)
@@ -263,24 +284,7 @@ internal fun NexTvRadioScreen(
                             }
                         }
                     }
-                    Glass(Modifier.fillMaxWidth().weight(1f).zone(NexTvRadioFocus.Zone.Favourites)) {
-                        Column {
-                            Label("♥  Favourite Stations", 13.sp, FontWeight.SemiBold, Color(0xFFFF6B8A))
-                            if (favStations.isEmpty()) {
-                                Label("Hold OK on a station to add it", 9.sp, color = Dim, modifier = Modifier.padding(top = 5.dp), lines = 2)
-                            } else Row(Modifier.padding(top = 7.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                favStations.take(4).forEachIndexed { index, station ->
-                                    var focused by remember { mutableStateOf(false) }
-                                    Box(
-                                        (if (index == 0) Modifier.focusRequester(favReq) else Modifier)
-                                            .onFocusChanged { focused = it.isFocused }
-                                            .border(if (focused) 2.dp else 0.dp, if (focused) Cyan else Color.Transparent, RoundedCornerShape(8.dp))
-                                            .clickable { onPlay(station) },
-                                    ) { StationLogo(station, 36.dp) }
-                                }
-                            }
-                        }
-                    }
+
                 }
             }
             Row(
@@ -324,9 +328,11 @@ private fun Label(
 @Composable
 private fun MenuPill(text: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
+    val focusScale by animateFloatAsState(if (focused) 1.035f else 1f, tween(200), label = "menuFocus")
     val shape = RoundedCornerShape(10.dp)
     Box(
-        modifier.onFocusChanged { focused = it.isFocused }.clip(shape)
+        modifier.graphicsLayer { scaleX = focusScale; scaleY = focusScale }
+            .onFocusChanged { focused = it.isFocused }.clip(shape)
             .background(if (selected) Color(0xFF164C99) else Color.Transparent, shape)
             .border(if (focused || selected) 1.5.dp else 0.dp, if (focused) Cyan else Color(0x996AB8FF), shape)
             .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp),
@@ -447,16 +453,16 @@ private fun NowPanel(
             }
             Row(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(
-                    Modifier.size(150.dp).border(2.dp, Brush.linearGradient(listOf(Cyan, Color(0xFF3B82F6))), RoundedCornerShape(16.dp)).padding(3.dp),
+                    Modifier.size(158.dp).border(2.dp, Brush.linearGradient(listOf(CyanSoft, Color(0xFF3B82F6))), RoundedCornerShape(18.dp)).padding(4.dp),
                 ) {
-                    if (current != null) StationLogo(current, 144.dp, 14.dp)
+                    if (current != null) StationLogo(current, 150.dp, 16.dp)
                     else Box(Modifier.fillMaxSize().clip(RoundedCornerShape(14.dp)).background(Color(0x33223355)), contentAlignment = Alignment.Center) {
                         Label("♪", 48.sp, color = Dim)
                     }
                 }
                 Column(Modifier.weight(1f).padding(start = 18.dp)) {
                     if (current != null) {
-                        Label(songTitle ?: current.name, 22.sp, FontWeight.Bold, lines = 2)
+                        Label(songTitle ?: current.name, 23.sp, FontWeight.Bold, lines = 2)
                         Label(message ?: songArtist ?: current.tagline, 14.sp, color = if (message != null) Color(0xFFE5C271) else Dim, lines = 2)
                         Label(current.name, 17.sp, FontWeight.SemiBold, Cyan, Modifier.padding(top = 4.dp))
                     } else {
@@ -467,14 +473,14 @@ private fun NowPanel(
                         Column(Modifier.fillMaxWidth().padding(top = 8.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .background(Color(0xDD0B1A33))
-                            .border(1.dp, Cyan.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                            .border(1.dp, GlassRim, RoundedCornerShape(12.dp))
                             .padding(8.dp)) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Label("FULL LYRICS", 10.sp, FontWeight.Bold, CyanSoft)
                                 Label("D-pad ↑↓ to scroll", 9.sp, color = Dim)
                             }
                             val lines = remember(fullLyrics) { fullLyrics.lines().filter { it.isNotBlank() } }
-                            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 130.dp), state = lyricsScrollState,
+                            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 150.dp), state = lyricsScrollState,
                                 verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                 itemsIndexed(lines) { index, line ->
                                     Label(line, 12.sp,
@@ -483,7 +489,7 @@ private fun NowPanel(
                             }
                         }
                     }
-                    Equaliser(playing, Modifier.fillMaxWidth().height(30.dp).padding(top = 6.dp), Cyan.copy(alpha = 0.8f), 28)
+                    Equaliser(playing, Modifier.fillMaxWidth().height(20.dp).padding(top = 6.dp), Cyan.copy(alpha = 0.7f), 18)
                 }
             }
             Row(
@@ -516,6 +522,13 @@ private fun RoundButton(label: String, size: Dp, modifier: Modifier, onClick: ()
 
 @Composable
 private fun Equaliser(active: Boolean, modifier: Modifier, color: Color, bars: Int) {
+    if (!active) {
+        Canvas(modifier) {
+            val w = size.width / (bars * 1.6f)
+            for (i in 0 until bars) drawRoundRect(color.copy(alpha = 0.35f), Offset(i * w * 1.6f, size.height * 0.75f), Size(w, size.height * 0.25f), CornerRadius(w / 2f))
+        }
+        return
+    }
     val transition = rememberInfiniteTransition(label = "nexradio-equaliser")
     val phase by transition.animateFloat(0f, 6.283f, infiniteRepeatable(tween(1400), RepeatMode.Restart), label = "phase")
     Canvas(modifier) {
