@@ -32,9 +32,9 @@ class NexTvRadioFocusTest {
     }
 
 
-    @Test fun controlsRightReachesRecentWhenAvailable() {
+    @Test fun controlsRightPrioritisesFavouritesAboveRecent() {
         assertEquals(
-            NexTvRadioFocus.Zone.Recent,
+            NexTvRadioFocus.Zone.Favourites,
             f.next(NexTvRadioFocus.Zone.Controls, NexTvRadioFocus.Dir.Right, true, true, control = 2, hasRecent = true),
         )
         assertEquals(
@@ -43,20 +43,25 @@ class NexTvRadioFocusTest {
         )
     }
 
-    @Test fun recentPanelRoutesToFavouritesAndBackToPlayer() {
+    @Test fun favouritesPanelRoutesDownToRecentAndBackUp() {
         assertEquals(
-            NexTvRadioFocus.Zone.Favourites,
-            f.next(NexTvRadioFocus.Zone.Recent, NexTvRadioFocus.Dir.Down, true, true, hasRecent = true),
+            NexTvRadioFocus.Zone.Recent,
+            f.next(NexTvRadioFocus.Zone.Favourites, NexTvRadioFocus.Dir.Down, true, true, hasRecent = true),
         )
-        assertNull(f.next(NexTvRadioFocus.Zone.Recent, NexTvRadioFocus.Dir.Down, true, false, hasRecent = true))
+        assertNull(f.next(NexTvRadioFocus.Zone.Favourites, NexTvRadioFocus.Dir.Down, true, true, hasRecent = false))
         assertEquals(
             NexTvRadioFocus.Zone.Controls,
             f.next(NexTvRadioFocus.Zone.Recent, NexTvRadioFocus.Dir.Left, true, true, hasRecent = true),
         )
         assertEquals(
-            NexTvRadioFocus.Zone.Recent,
-            f.next(NexTvRadioFocus.Zone.Favourites, NexTvRadioFocus.Dir.Up, true, true, hasRecent = true),
+            NexTvRadioFocus.Zone.Favourites,
+            f.next(NexTvRadioFocus.Zone.Recent, NexTvRadioFocus.Dir.Up, true, true, hasRecent = true),
         )
+    }
+
+    @Test fun favouritesUpReturnsMenuAndRecentWithoutFavouritesReturnsMenu() {
+        assertEquals(NexTvRadioFocus.Zone.Menu, f.next(NexTvRadioFocus.Zone.Favourites, NexTvRadioFocus.Dir.Up, true, true, hasRecent = true))
+        assertEquals(NexTvRadioFocus.Zone.Menu, f.next(NexTvRadioFocus.Zone.Recent, NexTvRadioFocus.Dir.Up, true, false, hasRecent = true))
     }
 
     @Test fun firstStationDetectionUsesFocusedId() {
