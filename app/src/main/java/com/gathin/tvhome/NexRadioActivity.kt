@@ -131,8 +131,20 @@ class NexRadioActivity : ComponentActivity() {
                 play(stations[target])
             }
             fun toggle() {
-                if (current == null) stations.firstOrNull()?.let(::play)
-                else if (playing) engine?.pause() else engine?.play()
+                if (current == null) {
+                    stations.firstOrNull()?.let(::play)
+                } else {
+                    val player = engine ?: return
+                    when {
+                        player.playbackState == Player.STATE_IDLE -> {
+                            val url = activeStreamUrls.getOrNull(streamAttempt) ?: current?.stream ?: return
+                            message = "Connecting…"
+                            startStream(url)
+                        }
+                        player.playWhenReady -> player.pause()
+                        else -> player.play()
+                    }
+                }
             }
 
             DisposableEffect(Unit) {
