@@ -4,6 +4,12 @@ import android.os.Bundle
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -46,8 +52,12 @@ class NexRadioActivity : ComponentActivity() {
         val prefs = getSharedPreferences("nexradio", MODE_PRIVATE)
         val legacy = getSharedPreferences("RadioActivity", MODE_PRIVATE)
 
+        val hub = NexTvHub(this)
         setContent {
-            var stations by remember { mutableStateOf<List<NexTvStation>>(featuredStations()) }
+            var paired by remember { mutableStateOf(hub.token() != null) }
+            var pairingCode by remember { mutableStateOf<String?>(null) }
+            var pairingMessage by remember { mutableStateOf("Connecting to NexTV Hub…") }
+            var stations by remember { mutableStateOf<List<NexTvStation>>(emptyList()) }
             var current by remember { mutableStateOf<NexTvStation?>(null) }
             var playing by remember { mutableStateOf(false) }
             var songTitle by remember { mutableStateOf<String?>(null) }
@@ -134,22 +144,43 @@ class NexRadioActivity : ComponentActivity() {
                 onDispose { engine?.removeListener(listener) }
             }
 
-            LaunchedEffect(Unit) {
-                val cached = withContext(Dispatchers.IO) {
-                    runCatching { parseDirectory(File(cacheDir, "nexradio-directory.json").readText()) }.getOrDefault(emptyList())
-                }
-                if (cached.isNotEmpty()) {
-                    stations = mergeFeatured(cached)
-                    message = null
-                }
-                val fresh = withContext(Dispatchers.IO) {
-                    fetchDirectory(File(cacheDir, "nexradio-directory.json"))
-                }
-                if (fresh.isNotEmpty()) {
-                    stations = mergeFeatured(fresh)
-                    if (current == null) message = null
-                } else if (cached.isEmpty()) {
-                    message = "Radio directory unavailable. Check internet connection."
+            LaunchedEffect(paired) {
+                if (!paired) {
+                    pairingCode = null
+                    pairingMessage = "Requesting NexTV Hub pairing code…"
+                    val result = withContext(Dispatchers.IO) { runCatching { hub.requestPairing() } }
+                    if (result.isFailure) {
+                        pairingMessage = "Cannot reach NexTV Hub. Select Retry."
+                    } else {
+                        val (code, expiry) = result.getOrThrow()
+                        pairingCode = code
+                        pairingMessage = "Open hub.nexdata.my, sign in and approve this code"
+                        val started = android.os.SystemClock.elapsedRealtime()
+                        while (!paired && android.os.SystemClock.elapsedRealtime() - started < expiry * 1000L) {
+                            delay(3000)
+                            val poll = withContext(Dispatchers.IO) { runCatching { hub.pollPairing(code) } }
+                            val token = poll.getOrNull()
+                            if (!token.isNullOrBlank()) {
+                                if (hub.saveToken(token)) {
+                                    paired = true
+                                    pairingCode = null
+                                } else pairingMessage = "Cannot save pairing securely. Select Retry."
+                                break
+                            }
+                            if (poll.isFailure) { pairingMessage = "Pairing check failed. Select Retry."; break }
+                        }
+                        if (!paired && pairingMessage.startsWith("Open ")) pairingMessage = "Pairing expired. Select Retry."
+                    }
+                } else {
+                    message = "Loading stations from NexTV Hub…"
+                    val result = withContext(Dispatchers.IO) { runCatching { hub.radio() } }
+                    if (result.isSuccess) {
+                        stations = mergeFeatured(result.getOrThrow())
+                        message = if (stations.isEmpty()) "Hub returned no playable stations" else null
+                    } else {
+                        message = result.exceptionOrNull()?.message ?: "Hub radio unavailable"
+                        if (hub.token() == null) paired = false
+                    }
                 }
             }
 
@@ -206,6 +237,23 @@ class NexRadioActivity : ComponentActivity() {
                 }
             }
 
+            if (!paired) {
+                androidx.compose.foundation.layout.Column(
+                    modifier = Modifier.fillMaxSize().padding(48.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("Pair Glass TV with NexTV Hub")
+                    Spacer(Modifier.height(20.dp))
+                    Text(pairingCode ?: "Waiting for pairing code…")
+                    Spacer(Modifier.height(12.dp))
+                    Text(pairingMessage)
+                    Spacer(Modifier.height(24.dp))
+                    Button(onClick = { pairingCode = null; pairingMessage = "Retrying…"; paired = true; paired = false }) { Text("Retry pairing") }
+                    Spacer(Modifier.height(12.dp))
+                    Button(onClick = { finish() }) { Text("Back") }
+                }
+            } else {
             NexTvRadioScreen(
                 stations = stations,
                 current = current,
@@ -225,6 +273,7 @@ class NexRadioActivity : ComponentActivity() {
                 onFavourite = ::toggleFavourite,
                 onHome = { finish() },
             )
+            }
         }
     }
 
