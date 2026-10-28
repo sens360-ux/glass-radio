@@ -111,9 +111,19 @@ class NexRadioActivity : ComponentActivity() {
                         }
                     }
                     override fun onMediaMetadataChanged(metadata: MediaMetadata) {
-                        songTitle = metadata.title?.toString()?.takeIf { it.isNotBlank() }
-                        songArtist = metadata.artist?.toString()?.takeIf { it.isNotBlank() }
-                        lyricsStartedAt = android.os.SystemClock.elapsedRealtime()
+                        val rawTitle = metadata.title?.toString()?.trim().orEmpty()
+                        val rawArtist = metadata.artist?.toString()?.trim().orEmpty()
+                        // NexTV handles ICY "Artist - Title" metadata, which often has no artist field.
+                        val parts = rawTitle.split(" - ", limit = 2)
+                        val parsedArtist = if (rawArtist.isBlank() && parts.size == 2) parts[0].trim() else rawArtist
+                        val parsedTitle = if (rawArtist.isBlank() && parts.size == 2) parts[1].trim() else rawTitle
+                        val nextTitle = parsedTitle.takeIf { it.isNotBlank() }
+                        val nextArtist = parsedArtist.takeIf { it.isNotBlank() }
+                        if (songTitle != nextTitle || songArtist != nextArtist) {
+                            songTitle = nextTitle
+                            songArtist = nextArtist
+                            lyricsStartedAt = android.os.SystemClock.elapsedRealtime()
+                        }
                     }
                     override fun onPlayerError(error: PlaybackException) {
                         message = "Station unavailable"
