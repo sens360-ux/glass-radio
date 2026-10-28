@@ -445,7 +445,7 @@ private fun NowPanel(
                         Label(if (message != null) message else "Pick a station", 20.sp, FontWeight.Bold, lines = 2)
                         Label("Choose one on the left and press OK.", 13.sp, color = Dim)
                     }
-                    if (playing && lyricsEnabled && !fullLyrics.isNullOrBlank()) {
+                    if (current != null && lyricsEnabled && !fullLyrics.isNullOrBlank()) {
                         Column(Modifier.fillMaxWidth().padding(top = 8.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .background(Color(0xDD0B1A33))
