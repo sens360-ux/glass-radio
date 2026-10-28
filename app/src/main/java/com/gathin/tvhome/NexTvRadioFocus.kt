@@ -22,17 +22,18 @@ internal object NexTvRadioFocus {
         Zone.Controls -> when (dir) {
             Dir.Up -> Zone.Menu
             Dir.Left -> if (control > 0) null else if (hasStations) Zone.Stations else Zone.Controls
-            Dir.Right -> if (control < 2) null else if (hasRecent) Zone.Recent else if (hasFavourites) Zone.Favourites else Zone.Controls
+            Dir.Right -> if (control < 2) null else if (hasFavourites) Zone.Favourites else if (hasRecent) Zone.Recent else Zone.Controls
             Dir.Down -> Zone.Controls
         }
         Zone.Recent -> when (dir) {
-            Dir.Up -> Zone.Menu
-            Dir.Down -> if (hasFavourites) Zone.Favourites else null
+            Dir.Up -> if (hasFavourites) Zone.Favourites else Zone.Menu
+            Dir.Down -> null
             Dir.Left -> Zone.Controls
             Dir.Right -> null
         }
         Zone.Favourites -> when (dir) {
-            Dir.Up -> if (hasRecent) Zone.Recent else Zone.Menu
+            Dir.Up -> Zone.Menu
+            Dir.Down -> if (hasRecent) Zone.Recent else null
             Dir.Left -> Zone.Controls
             else -> null
         }
