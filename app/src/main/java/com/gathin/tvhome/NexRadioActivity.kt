@@ -125,14 +125,17 @@ class NexRadioActivity : ComponentActivity() {
                 }
             }
             fun step(delta: Int) {
-                if (stations.isEmpty()) return
-                val index = stations.indexOfFirst { it.id == current?.id }
-                val target = if (index < 0) 0 else Math.floorMod(index + delta, stations.size)
-                play(stations[target])
+                // Channel +/- follows the same favourites-first order shown on screen.
+                val ordered = stations.sortedWith(compareByDescending<NexTvStation> { it.id in favouriteIds })
+                if (ordered.isEmpty()) return
+                val index = ordered.indexOfFirst { it.id == current?.id }
+                val target = if (index < 0) 0 else Math.floorMod(index + delta, ordered.size)
+                play(ordered[target])
             }
             fun toggle() {
                 if (current == null) {
-                    stations.firstOrNull()?.let(::play)
+                    stations.firstOrNull { it.id in favouriteIds }?.let(::play)
+                        ?: stations.firstOrNull()?.let(::play)
                 } else {
                     val player = engine ?: return
                     when {
