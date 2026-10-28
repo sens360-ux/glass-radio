@@ -9,6 +9,9 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.Metadata
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.extractor.metadata.icy.IcyInfo
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -50,6 +53,7 @@ class NexRadioActivity : ComponentActivity() {
             var stations by remember { mutableStateOf<List<NexTvStation>>(featuredStations()) }
             var current by remember { mutableStateOf<NexTvStation?>(null) }
             var playing by remember { mutableStateOf(false) }
+            var streamAttempt by remember { mutableIntStateOf(0) }
             var songTitle by remember { mutableStateOf<String?>(null) }
             var songArtist by remember { mutableStateOf<String?>(null) }
             var lyricsEnabled by remember { mutableStateOf(prefs.getBoolean("lyrics_enabled", true)) }
@@ -72,8 +76,32 @@ class NexRadioActivity : ComponentActivity() {
                 favouriteIds = if (s.id in favouriteIds) favouriteIds - s.id else favouriteIds + s.id
                 prefs.edit().putStringSet("favourites", favouriteIds).apply()
             }
+            fun updateSong(rawTitle: String, rawArtist: String = "") {
+                val title = rawTitle.trim()
+                if (title.isBlank() || title.equals(current?.name, ignoreCase = true)) return
+                val artist = rawArtist.trim()
+                val parts = title.split(" - ", limit = 2)
+                val nextArtist = (if (artist.isBlank() && parts.size == 2) parts[0].trim() else artist)
+                    .takeIf { it.isNotBlank() }
+                val nextTitle = (if (artist.isBlank() && parts.size == 2) parts[1].trim() else title)
+                    .takeIf { it.isNotBlank() }
+                if (songTitle != nextTitle || songArtist != nextArtist) {
+                    songTitle = nextTitle
+                    songArtist = nextArtist
+                    lyricsStartedAt = android.os.SystemClock.elapsedRealtime()
+                }
+            }
+            fun startStream(url: String) {
+                engine?.apply {
+                    stop()
+                    setMediaItem(MediaItem.fromUri(url))
+                    prepare()
+                    play()
+                }
+            }
             fun play(s: NexTvStation) {
                 current = s
+                streamAttempt = 0
                 songTitle = null
                 songArtist = null
                 lyricLine = null
@@ -81,12 +109,7 @@ class NexRadioActivity : ComponentActivity() {
                 message = "Connecting…"
                 recentIds = (listOf(s.id) + recentIds.filter { it != s.id }).take(12)
                 prefs.edit().putString("recent", recentIds.joinToString("\n")).apply()
-                engine?.apply {
-                    stop()
-                    setMediaItem(MediaItem.fromUri(s.stream))
-                    prepare()
-                    play()
-                }
+                startStream(streamCandidates(s).first())
             }
             fun step(delta: Int) {
                 if (stations.isEmpty()) return
@@ -111,23 +134,30 @@ class NexRadioActivity : ComponentActivity() {
                         }
                     }
                     override fun onMediaMetadataChanged(metadata: MediaMetadata) {
-                        val rawTitle = metadata.title?.toString()?.trim().orEmpty()
-                        val rawArtist = metadata.artist?.toString()?.trim().orEmpty()
-                        // NexTV handles ICY "Artist - Title" metadata, which often has no artist field.
-                        val parts = rawTitle.split(" - ", limit = 2)
-                        val parsedArtist = if (rawArtist.isBlank() && parts.size == 2) parts[0].trim() else rawArtist
-                        val parsedTitle = if (rawArtist.isBlank() && parts.size == 2) parts[1].trim() else rawTitle
-                        val nextTitle = parsedTitle.takeIf { it.isNotBlank() }
-                        val nextArtist = parsedArtist.takeIf { it.isNotBlank() }
-                        if (songTitle != nextTitle || songArtist != nextArtist) {
-                            songTitle = nextTitle
-                            songArtist = nextArtist
-                            lyricsStartedAt = android.os.SystemClock.elapsedRealtime()
+                        // Some stations send the song via MediaMetadata, others via timed ICY.
+                        // Empty metadata must not clear a title already received from ICY.
+                        val title = metadata.title?.toString().orEmpty()
+                        if (title.isNotBlank()) updateSong(title, metadata.artist?.toString().orEmpty())
+                    }
+                    @androidx.annotation.OptIn(UnstableApi::class)
+                    override fun onMetadata(metadata: Metadata) {
+                        for (i in 0 until metadata.length()) {
+                            val entry = metadata[i]
+                            if (entry is IcyInfo) {
+                                entry.title?.let { updateSong(it) }
+                            }
                         }
                     }
                     override fun onPlayerError(error: PlaybackException) {
-                        message = "Station unavailable"
-                        playing = false
+                        val options = current?.let(::streamCandidates).orEmpty()
+                        if (streamAttempt + 1 < options.size) {
+                            streamAttempt++
+                            message = "Trying alternate stream…"
+                            startStream(options[streamAttempt])
+                        } else {
+                            message = "Station unavailable (" + error.errorCodeName + ")"
+                            playing = false
+                        }
                     }
                 }
                 engine?.addListener(listener)
@@ -219,7 +249,6 @@ class NexRadioActivity : ComponentActivity() {
                 favourites = favouriteIds,
                 recent = recentIds,
                 sourceLabel = "Public Radio",
-                onHub = {},
                 onPlay = ::play,
                 onToggle = ::toggle,
                 onNext = { step(1) },
@@ -316,20 +345,33 @@ class NexRadioActivity : ComponentActivity() {
 
     private fun featuredStations() = listOf(
         NexTvStation("featured-era", "ERA FM",
-            "https://stream.rcs.revma.com/crec9cmbv4uvv/12_7yx6mmm02au702/playlist.m3u8",
+            "https://stream.rcs.revma.com/crec9cmbv4uvv",
             tagline = "Muzik Hit Terkini", group = "Astro"),
         NexTvStation("featured-ikim", "IKIM FM",
-            "https://ais-sa8.cdnstream1.com/5035",
+            "https://ais-sa8.cdnstream1.com/5035/playlist.m3u8",
             tagline = "Inspirasi Utama Anda", group = "Others"),
     )
+
+    /** Direct audio endpoints, not browser player pages. Retry only after an actual player error. */
+    private fun streamCandidates(station: NexTvStation): List<String> = when (station.id) {
+        "featured-era" -> listOf(
+            "https://stream.rcs.revma.com/crec9cmbv4uvv",
+            "https://stream.rcs.revma.com/crec9cmbv4uvv/14_1mxuqy6p1izr902/playlist.m3u8",
+        )
+        "featured-ikim" -> listOf(
+            "https://ais-sa8.cdnstream1.com/5035/playlist.m3u8",
+            "https://ais-sa8.cdnstream1.com/5035",
+        )
+        else -> listOf(station.stream)
+    }
 
     private fun stationKey(name: String): String {
         val cleaned = name.uppercase(java.util.Locale.ROOT)
             .replace(Regex("\\b(FM|RADIO|MALAYSIA)\\b"), " ")
             .replace(Regex("[^A-Z0-9]+"), " ").trim()
         return when (cleaned) {
-            "ERA", "ERA JE" -> "ERA"
-            "IKIM" -> "IKIM"
+            "ERA", "ERA JE", "ERA KUALA LUMPUR", "ERA 103 3" -> "ERA"
+            "IKIM", "IKIM KUALA LUMPUR", "IKIMFM" -> "IKIM"
             "HOT" -> "HOT"
             "THR GEGAR", "GEGAR" -> "GEGAR"
             else -> cleaned
